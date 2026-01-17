@@ -4,7 +4,7 @@ Welcome to the Quantix deployment documentation. Choose the guide that matches y
 
 ## Cloud Provider Guides
 
-*   **[Google Cloud Platform (GCP)](DEPLOYMENT_GCP.md)**
+*   **[Google Cloud Platform (GCP)](DEPLOYMENT_GoogleCloudPlateform.md)**
     *   *Recommended for new users.* Utilizes the GCP Free Tier.
     *   Covers setting up the main node and firewall rules.
 *   **[Amazon Web Services (AWS)](DEPLOYMENT_AWS.md)**
@@ -22,7 +22,7 @@ Welcome to the Quantix deployment documentation. Choose the guide that matches y
     *   Detailed guide on setting up the very first node of the network (The Genesis Node).
 *   **[Adding Peer Nodes](DEPLOYMENT_PEER.md)**
     *   How to add more nodes to the network to increase decentralization.
-*   **[GCP Operations Guide](GCP_OPS_TUTORIAL.md)**
+*   **[GCP Operations Guide](GoogleCloudPlateform_OPS_TUTORIAL.md)**
     *   Manage Static IPs, Backups, and Monitoring on Google Cloud.
 *   **[Troubleshooting](TROUBLESHOOTING.md)**
     *   Common issues and how to resolve them.
