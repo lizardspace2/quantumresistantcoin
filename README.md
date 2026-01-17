@@ -2,6 +2,8 @@
 
 Quantix is a lightweight, Proof-of-Stake (PoS) blockchain implementation geared towards scalability and ease of deployment.
 
+**🌐 Official Webapp:** [www.quantumresistantcoin.com](https://www.quantumresistantcoin.com)
+
 ## 🚀 Deployment
 
 We provide detailed guides for deploying Quantix nodes across various cloud providers, with a primary focus on Google Cloud Platform.
