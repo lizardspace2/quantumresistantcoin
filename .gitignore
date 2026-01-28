@@ -1,2 +1,5 @@
 node_modules
 genesis_key.json
+node/
+dist/
+*.log
