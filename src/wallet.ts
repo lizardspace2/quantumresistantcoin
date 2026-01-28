@@ -17,15 +17,11 @@
  * Based on work by Sandoche Adittane and Lauri Hartikka.
  */
 
+import * as crypto from 'crypto';
 import { ml_dsa65, ml_dsa44 } from './noble/ml-dsa';
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import _ from 'lodash';
-import { UnspentTxOut, TxIn, Transaction, TxOut } from './transaction';
-
-const privateKeyLocation = 'node/wallet/private_key.json'; // Adjusted path to match typical structure or keep as is?
-// The user's code had `data/blockchain.json`, let's assume `node/wallet/...`
-// Actually, original code imported `getPrivateFromWallet` but didn't show `wallet.ts`.
-// I'll assume a standard file-based wallet for this patch.
+import { UnspentTxOut, TxIn, Transaction, TxOut, signTxIn, getTransactionId } from './transaction';
 
 const privateKeyFile = 'node/wallet/private_key';
 
@@ -62,9 +58,6 @@ const getPrivateFromWallet = (): string => {
 
 const getPublicFromWallet = (): string => {
     const privateKey = getPrivateFromWallet();
-    // In new crypto, private key string might be seed (32 bytes) or full SK.
-    // Assuming we store the SEED as hex for simplicity, or the full SK hex.
-    // If it's 32 bytes (64 hex chars), it's a seed.
     const keyBytes = hex2buf(privateKey);
     let publicKey: Uint8Array;
 
@@ -73,25 +66,12 @@ const getPublicFromWallet = (): string => {
         const keys = ml_dsa44.keygen(keyBytes);
         publicKey = keys.publicKey;
     } else {
-        // Assuming full SK
-        // Try to detect or fallback
         try {
-            // If length matches L2 SK
             if (keyBytes.length === 2560) {
-                // It's L2
-                publicKey = keyBytes.slice(2560 - 1312); // In FIPS 204 SK, PK is at end? 
-                // Actually noble implementation: SK = [rho, K, tr, s1, s2, t0]. PK = [rho, t1].
-                // It's not a simple slice.
-                // We should use the library if possible.
-                // But noble doesn't expose `getPublicKey(sk)`.
-                // We rely on seed if possible.
                 throw new Error("Cannot derive PK from SK without re-keygen. Use Seed.");
             }
-
-            // Fallback for L3
-            // ...
-            throw new Error("Cannot derive PK from SK without re-keygen. Use Seed.");
-
+            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
+            publicKey = keys.publicKey;
         } catch (e) {
             // Fallback: Try using first 32 bytes as seed for L2 (default migration)
             const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
@@ -106,7 +86,7 @@ const initWallet = () => {
     if (existsSync(privateKeyFile)) {
         return;
     }
-    const seed = crypto.getRandomValues(new Uint8Array(32));
+    const seed = new Uint8Array(crypto.randomBytes(32));
     const seedHex = buf2hex(seed);
     const keyObj = { privateKey: seedHex };
     writeFileSync(privateKeyFile, JSON.stringify(keyObj, null, 2));
@@ -130,29 +110,17 @@ const findUnspentTxOuts = (ownerAddress: string, unspentTxOuts: UnspentTxOut[]) 
 };
 
 // Replaces the old 'dilithium' binding.
-// Returns an object matching the interface used in transaction.ts (sign, verify)
-// but adapting it to @noble/post-quantum
 const getDilithiumSync = () => {
     return {
         // Sign: (message, privateKey, level) -> signature
         sign: (message: Uint8Array, privateKey: Uint8Array, level: number) => {
             // Level 2 (ML-DSA-44): Seed 32, SK 2560
-            // Level 3 (ML-DSA-65): Seed 32, SK 4032 (or 4000+ depending on implementation details)
-
-            // If passed a 32-byte seed, we need to decide which level to use. 
-            // The argument 'level' passed from transaction.ts/wallet logic isn't always reliable or used.
-            // PROPOSAL: Default to Level 2 if not specified, OR support explicit differentiation?
-            // Current codebase seems to default to Level 3.
-            // But user wants Level 2 support.
+            // Level 3 (ML-DSA-65): Seed 32, SK 4032
 
             let secretKey = privateKey;
 
             // Case: Seed provided (32 bytes)
             if (privateKey.length === 32) {
-                // We default to Level 3 to match existing behavior for new blocks/wallet?
-                // OR we check 'level' param? usage: dilithium.sign(..., DILITHIUM_LEVEL)
-                // DILITHIUM_LEVEL is const 3.
-
                 if (level === 2) {
                     const keys = ml_dsa44.keygen(privateKey);
                     return ml_dsa44.sign(message, keys.secretKey);
@@ -163,7 +131,6 @@ const getDilithiumSync = () => {
             }
 
             // Case: Full SK provided
-            // ML-DSA-44 SK size is 2560 bytes
             if (privateKey.length === 2560) {
                 return ml_dsa44.sign(message, privateKey);
             }
@@ -173,49 +140,115 @@ const getDilithiumSync = () => {
         },
         // Verify: (signature, message, publicKey, level) -> boolean
         verify: (signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array, level: number) => {
-            // Auto-detect based on Public Key length
             if (publicKey.length === 1312) {
-                // Level 2 (ML-DSA-44)
                 return ml_dsa44.verify(signature, message, publicKey);
             }
-            // Default to Level 3 (ML-DSA-65) - PK size 1952
             return ml_dsa65.verify(signature, message, publicKey);
         }
     };
 };
 
-const DILITHIUM_LEVEL = 3; // Kept for compatibility, though unused logic-wise
+const DILITHIUM_LEVEL = 3;
 
-// Transaction Creation Helper (migrated logic if needed, but mainly used by wallet/frontend)
-const createTransaction = (receiverAddress: string, amount: number, privateKey: string, unspentTxOuts: UnspentTxOut[], txPool: Transaction[]): Transaction => {
-    // This logic is usually in wallet.ts.
-    // I will simplify it as the user seemed to rely on the existing one.
-    // But since I don't have the original wallet.ts, I MUST provide it if transaction.ts imports it.
+// --- Helper for createTransaction (Local version of getPublicFromWallet logic) ---
+const getPublicKey = (aPrivateKey: string): string => {
+    const keyBytes = hex2buf(aPrivateKey);
+    let publicKey: Uint8Array;
 
-    // ... Implementation of createTransaction similar to frontend ...
-    // For brevity in this thought process, I will include a basic implementation.
-
-    // Note: To avoid circular dependency issues if transaction.ts imports wallet.ts and vice versa for types,
-    // ensure imports are clean.
-
-    // Actually, createTransaction logic is complex.
-    // I will return a placeholder or minimal implementation if the user didn't ask for wallet features on the node side?
-    // Wait, the NODE needs to create Coinbase transactions (mining).
-    // And `sendTransaction` endpoint on node uses `createTransaction`.
-    // So YES, I need to implement it.
-
-    // I'll leave the complex selection logic to a TODO or copy standard logic if I have it.
-    // I'll copy the logic from the frontend's `quantix-crypto.ts` but adapted.
-
-    throw new Error("Wallet transaction creation is not fully implemented in this patch. Please use the frontend for signing.");
+    if (keyBytes.length === 32) {
+        const keys = ml_dsa44.keygen(keyBytes);
+        publicKey = keys.publicKey;
+    } else {
+        try {
+            if (keyBytes.length === 2560) {
+                throw new Error("Only Seed-based private keys supported for now");
+            }
+            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
+            publicKey = keys.publicKey;
+        } catch (e) {
+            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
+            publicKey = keys.publicKey;
+        }
+    }
+    return buf2hex(publicKey);
 };
 
-// Wait, if I break `sendTransaction` on the node, the user might complain.
-// But the user's main issue is BROADCASTING from the frontend.
-// The frontend constructs the TX.
-// The node just VALIDATES it.
-// So `initWallet` and `getDilithiumSync` are critical for mining (coinbase) and validation.
-// `createTransaction` is only for the node's own wallet features. I can implement it properly.
+const createTransaction = (receiverAddress: string, amount: number, privateKey: string, unspentTxOuts: UnspentTxOut[], txPool: Transaction[]): Transaction => {
+    const myAddress: string = getPublicKey(privateKey);
+    const myUnspentTxOutsA = unspentTxOuts.filter((uTxO: UnspentTxOut) => uTxO.address === myAddress);
+
+    const myUnspentTxOuts = filterTxPoolTxs(myUnspentTxOutsA, txPool);
+
+    const { includedUnspentTxOuts, leftOverAmount } = findTxOutsForAmount(amount, myUnspentTxOuts);
+
+    const toUnsignedTxIn = (uTxO: UnspentTxOut) => {
+        const txIn: TxIn = new TxIn();
+        txIn.txOutId = uTxO.txOutId;
+        txIn.txOutIndex = uTxO.txOutIndex;
+        return txIn;
+    };
+
+    const unsignedTxIns: TxIn[] = includedUnspentTxOuts.map(toUnsignedTxIn);
+
+    const tx: Transaction = new Transaction();
+    tx.txIns = unsignedTxIns;
+    tx.txOuts = createTxOuts(receiverAddress, myAddress, amount, leftOverAmount);
+    tx.id = getTransactionId(tx);
+
+    tx.txIns = tx.txIns.map((txIn: TxIn, index: number) => {
+        txIn.signature = signTxIn(tx, index, privateKey, unspentTxOuts);
+        return txIn;
+    });
+
+    return tx;
+};
+
+const filterTxPoolTxs = (unspentTxOuts: UnspentTxOut[], transactionPool: Transaction[]): UnspentTxOut[] => {
+    const txIns: TxIn[] = _(transactionPool)
+        .map((tx: Transaction) => tx.txIns)
+        .flatten()
+        .value();
+
+    const removable: UnspentTxOut[] = [];
+    for (const unspentTxOut of unspentTxOuts) {
+        const txIn = _.find(txIns, (aTxIn: TxIn) => {
+            return aTxIn.txOutIndex === unspentTxOut.txOutIndex && aTxIn.txOutId === unspentTxOut.txOutId;
+        });
+
+        if (txIn !== undefined) {
+            removable.push(unspentTxOut);
+        }
+    }
+
+    return _.without(unspentTxOuts, ...removable);
+};
+
+const findTxOutsForAmount = (amount: number, myUnspentTxOuts: UnspentTxOut[]) => {
+    let currentAmount = 0;
+    const includedUnspentTxOuts = [];
+    for (const myUnspentTxOut of myUnspentTxOuts) {
+        includedUnspentTxOuts.push(myUnspentTxOut);
+        currentAmount = currentAmount + myUnspentTxOut.amount;
+        if (currentAmount >= amount) {
+            const leftOverAmount = currentAmount - amount;
+            return { includedUnspentTxOuts, leftOverAmount };
+        }
+    }
+
+    const eMsg = 'Cannot create transaction from the available unspent transaction outputs.' +
+        ' Required amount:' + amount + '. Available unspentTxOuts:' + JSON.stringify(myUnspentTxOuts);
+    throw Error(eMsg);
+};
+
+const createTxOuts = (receiverAddress: string, myAddress: string, amount: number, leftOverAmount: number) => {
+    const txOut1: TxOut = new TxOut(receiverAddress, amount);
+    if (leftOverAmount === 0) {
+        return [txOut1];
+    } else {
+        const leftOverTx = new TxOut(myAddress, leftOverAmount);
+        return [txOut1, leftOverTx];
+    }
+};
 
 export {
     initWallet, deleteWallet,
