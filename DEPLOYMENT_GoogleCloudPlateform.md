@@ -236,3 +236,34 @@ This method is closer to a real decentralized network.
 ---
 
 **Note**: The external IP of a VM can change if you stop/restart it. For production, it is advisable to reserve a **Static External IP Address** in the "VPC Network > IP Addresses" section and attach it to your VM.
+
+## MORE
+
+git clone https://github.com/lizardspace2/quantumresistantcoin.git
+cd quantumresistantcoin
+
+## 4. Genesis Configuration
+
+The Genesis node needs the private key that controls the initial 100 million coins.
+
+1.  **Import the key**: Transfer your `genesis_key.json` file (created locally) to the server.
+    *   *SSH Web Tip*: "Upload file" button in the top right.
+2.  **Place the key**:
+    ```bash
+    mv ~/genesis_key.json ~/NaivecoinStake-Proof-of-Stake-Core/
+    ```
+
+## 5. Launch
+
+Use the `docker-compose.prod.yml` file (already included):
+
+```bash
+sudo docker compose -f docker-compose.prod.yml up -d --build
+```
+
+## 6. Verification
+
+The blockchain should start. Verify via the API:
+`http://EXTERNAL_IP:3001/blocks`
+
+You should see block #0 (Genesis) with your funds.
