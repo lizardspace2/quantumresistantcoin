@@ -2,6 +2,15 @@
 
 This guide details step-by-step how to deploy your Quantix node on the Google Cloud Platform Free Tier.
 
+## Introduction: Node Types
+
+Before starting, it is important to understand which type of node you are deploying:
+
+*   **Standard Node (Peer)**: This is what 99% of users will deploy. It connects to the network, syncs the blockchain, and can mine blocks if it has a balance. It generates its own unique identity (wallet) automatically.
+*   **Genesis Node (Bootnode)**: This is the specific node that created the network and holds the initial 100 million coin supply. **You do not need to follow Genesis instructions unless you are re-deploying the network root.**
+
+---
+
 ## 1. Creating the Virtual Machine (VM)
 
 The GCP Free Tier includes an `e2-micro` instance in specific regions.
@@ -10,7 +19,7 @@ The GCP Free Tier includes an `e2-micro` instance in specific regions.
 2.  Go to **Compute Engine** > **VM instances**.
 3.  Click on **Create Instance**.
 4.  **Important Configuration (for free tier):**
-    *   **Name**: `quantix-node-1`
+    *   **Name**: `quantix-node`
     *   **Region**: Choose `us-central1`, `us-west1` or `us-east1` (Only these regions are eligible for the Free Tier).
     *   **Machine type**: `e2-micro` (2 vCPU, 1 GB memory).
     *   **Boot disk**: Click "Change".
@@ -24,27 +33,23 @@ The GCP Free Tier includes an `e2-micro` instance in specific regions.
 
 ## 2. Firewall Configuration (Opening Ports)
 
-By default, only ports 80 (HTTP) and 443 (HTTPS) are open. You need to open port **3001** (API) and **6001** (P2P).
+Your node needs to communicate with the world. By default, Google Cloud blocks most connections. We need to open two specific ports:
+
+*   **Port 3001 (HTTP API)**: Used to query your node (e.g., getting your balance, checking block height).
+*   **Port 6001 (P2P WebSocket)**: Used by the node to talk to other nodes (peers) to receive new blocks and transactions.
+
+**Steps:**
 
 1.  In the console, search for "Firewall policies" or go to **VPC network** > **Firewall**.
 2.  Click **Create Firewall Rule**.
 3.  **Name**: `allow-quantix-ports`
 4.  **Targets**: `All instances in the network`
-5.  **Source IP ranges**: `0.0.0.0/0` (Allows everyone).
+5.  **Source IP ranges**: `0.0.0.0/0` (Allows everyone to connect).
 6.  **Protocols and ports**:
     *   Check `tcp` and enter: `3001,6001`
 7.  Click **Create**.
 
-### Alternative: Via Cloud Shell
-
-If you prefer the command line, open the **Cloud Shell** (terminal icon at the top right of the console) and run:
-
-```bash
-gcloud compute firewall-rules create allow-quantix-ports \
-    --allow tcp:3001,tcp:6001 \
-    --source-ranges 0.0.0.0/0 \
-    --description="Allow API and P2P ports for Quantix Coin"
-```
+---
 
 ## 3. Node Installation and Launch
 
@@ -53,8 +58,11 @@ gcloud compute firewall-rules create allow-quantix-ports \
 3.  Run the following commands one by one:
 
 ### A. Install Docker and Git
+
+We use Docker to run the node in a contained, consistent environment.
+
 ```bash
-# 1. Update and install prerequisites (including 'nano' to edit files)
+# 1. Update and install prerequisites
 sudo apt-get update
 sudo apt-get install -y ca-certificates curl gnupg lsb-release git nano
 
@@ -77,193 +85,133 @@ sudo docker run hello-world
 
 ### B. Configure and Launch the Node
 
-1.  **Clone your repository**
-    (Replace URL_OF_REPO with your GitHub/GitLab repo URL)
+1.  **Clone the Repository**
+    Download the latest version of the code to your server.
     ```bash
-    git clone https://github.com/lizardspace2/Quantix-Core.git
-    cd Quantix-Core
+    git clone https://github.com/lizardspace2/quantumresistantcoin.git
+    cd quantumresistantcoin
     ```
 
-2.  **Production configuration**
-    The `docker-compose.prod.yml` file is already included in the repository. It defines a single-node installation.
-
-    You can check its content:
-    ```bash
-    cat docker-compose.prod.yml
-    ```
-
-3.  **Configure the Genesis Key (Recommended Method: Import)**
-    Do not copy-paste the text, the file is too large and would crash the terminal. Use the import tool.
-
-    1.  In the SSH window (browser), click the **"Upload file"** button located in the top right menu (gear or "up arrow" icon).
-    2.  Select your `genesis_key.json` file on your computer.
-    3.  Once the transfer is complete, move it to the project folder:
-    ```bash
-    mv ~/genesis_key.json ~/Quantix-Core/
-    ```
-    (If the command fails, do `ls` to see where the file is).
-
-4.  **Launch the node**
-    Use the production configuration file to launch the node:
-    ```bash
-    sudo docker compose -f docker-compose.prod.yml up -d --build
-    ```
-
-    *   `-f docker-compose.prod.yml`: Uses our specific configuration.
-    *   `-d`: "Detached" mode (runs in the background).
-    *   `--build`: Builds the Docker image.
-
-## 4. Verification
-
-Once launched, verify that everything is working:
-
-1.  Get the **External IP** of your VM in the Google Cloud console.
-2.  In your browser, go to: `http://EXTERNAL_IP:3001/blocks`
-3.  You should see the Genesis block with your 100 million coins.
-
-## 5. Maintenance and Logs
-
-- **View logs**:
-  ```bash
-  sudo docker compose -f docker-compose.prod.yml logs -f
-  ```
-- **Stop the node**:
-  ```bash
-  sudo docker compose -f docker-compose.prod.yml down
-  ```
-- **Update the code**:
-  ```bash
-  git pull
-  sudo docker compose -f docker-compose.prod.yml up -d --build
-  ```
-
-## 6. Create a Test Network
-
-### Option A: On the same machine (Recommended for quick testing)
-
-To test the blockchain with multiple peers on **the same machine** (without paying for an extra VM), you can create a multi-node configuration.
-
-1.  **Create the multi-node configuration**
-    Create a `docker-compose.multi.yml` file:
-    ```bash
-    nano docker-compose.multi.yml
-    ```
-    Paste the following content. This creates:
-    *   **node1**: Your main node (Ports 3001/6001) with the Genesis key.
-    *   **node2**: A new blank node (Ports 3002/6002) that connects to node1.
-
-    ```yaml
-    version: '3'
-    services:
-      node1:
-        build: .
-        container_name: quantix-node-1
-        ports:
-          - "3001:3001"
-          - "6001:6001"
-        environment:
-          - HTTP_PORT=3001
-          - P2P_PORT=6001
-          - PEERS=
-          - PRIVATE_KEY=node/wallet/private_key_1
-        volumes:
-          - ./genesis_key.json:/app/node/wallet/private_key_1
-
-      node2:
-        build: .
-        container_name: quantix-node-2
-        ports:
-          - "3002:3002"
-          - "6002:6002"
-        environment:
-          - HTTP_PORT=3002
-          - P2P_PORT=6002
-          - PEERS=ws://node1:6001
-          - PRIVATE_KEY=node/wallet/private_key_2
-        depends_on:
-          - node1
-    ```
-
-2.  **Launch the network**
-    First, stop the single node if it's running:
-    ```bash
-    sudo docker compose -f docker-compose.prod.yml down
-    ```
-    Then launch the multi-node:
-    ```bash
-    sudo docker compose -f docker-compose.multi.yml up -d --build
-    ```
-
-3.  **Verification**
-    *   **Node 1**: `http://EXTERNAL_IP:3001/peers` (Should show node2 connected)
-    *   **Node 2**: `http://EXTERNAL_IP:3002/blocks` (Should sync and have the Genesis block)
-
-    *Note: If you are using the firewall, make sure to also open ports 3002 and 6002 if you want to access them from outside.*
-
-### Option B: On a second virtual machine (User Preference)
-
-This method is closer to a real decentralized network.
-*Warning: The second VM may incur costs if your free server quota is exceeded.*
-
-1.  **Create the second VM (`quantix-node-2`)**
-    *   Follow step 1 of this guide to create a new instance.
-    *   Apply the **same firewall rule** (the `allow-quantix-ports` rule applies to the entire network if configured on `0.0.0.0/0`).
-
-2.  **Install the software**
-    *   SSH into `quantix-node-2`.
-    *   Follow step 3.A to install Docker and Git.
-    *   Clone the repository (Step 3.B.1).
-
-3.  **Configure Node 2**
-    The repository contains a file **already configured** for the public network: `docker-compose-peer.yml`.
+2.  **Launch the Standard Node**
+    We use the `docker-compose-peer.yml` configuration. This file is specifically designed for standard nodes.
     
-    Thanks to the "Bootnode" update, the node will **automatically** connect to the main network without any IP configuration.
+    *What does this configuration do?*
+    *   **Auto-Wallet**: It immediately generates a secure, post-quantum private key (`node/wallet/private_key`) if one doesn't exist.
+    *   **Data Persistence**: It maps the internal `data` folder to your server's storage, so you don't lose the blockchain if you restart.
+    *   **Auto-Connect**: It enables the P2P module to find the network bootnodes.
 
-    You have **nothing to do** at this step!
-
-4.  **Launch Node 2**
+    Run the launch command:
     ```bash
     sudo docker compose -f docker-compose-peer.yml up -d --build
     ```
 
-5.  **Verification**
-    Check the logs to see the connection:
+    *   `-d`: Detached mode (runs in background).
+    *   `--build`: Compiles the latest code from source.
+
+## 4. Verification
+
+Once the command finishes, your node is running. Let's verify it.
+
+### 1. Check the Logs
+See what the node is doing in real-time.
+```bash
+sudo docker compose -f docker-compose-peer.yml logs -f
+```
+**What to look for:**
+*   `New wallet initialized.` (First run only)
+*   `Connect to peers: ws://34.58.38.118:6001...` (Connection to Bootnode)
+*   `received block: ...` (Syncing with the network)
+
+(Press `Ctrl + C` to exit logs)
+
+### 2. Check the API
+Find your VM's **External IP** in the Google Cloud Console.
+Open your browser and visit: `http://YOUR_EXTERNAL_IP:3001/info`
+
+You should see a JSON response like:
+```json
+{
+  "height": 12,
+  "latestHash": "...",
+  "totalSupply": 100000000
+}
+```
+If `height` matches the explorer, your node is fully synced!
+
+## 5. IMPORTANT: Backup Your Key
+
+Your node has generated a unique private key. **If you lose this key, you lose access to any coins this node mines or receives.**
+
+### To see your address:
+```bash
+curl http://localhost:3001/address
+```
+
+### To backup your key:
+The key is stored in `~/quantumresistantcoin/node/wallet/private_key`.
+
+1.  **Display the key content (Be careful, do not share this!)**:
     ```bash
-    sudo docker compose -f docker-compose-peer.yml logs -f
+    cat ~/quantumresistantcoin/node/wallet/private_key
     ```
-    You should see `connection to peer: ws://NODE_1_IP:6001`.
+2.  **Copy the output** and save it securely (e.g., in a password manager).
+3.  **Alternative (Download)**:
+    In the SSH window, click the **Gear Icon** > **Download File**.
+    Enter the path: `/home/YOUR_USERNAME/quantumresistantcoin/node/wallet/private_key`
+    (Type `pwd` to find your full username path if unsure).
+
+## 6. Maintenance Commands
+
+**Stop the node:**
+```bash
+sudo docker compose -f docker-compose-peer.yml down
+```
+
+**Restart the node:**
+```bash
+sudo docker compose -f docker-compose-peer.yml restart
+```
+
+**Update the software:**
+```bash
+# 1. Get latest code
+git pull
+
+# 2. Rebuild and restart
+sudo docker compose -f docker-compose-peer.yml up -d --build
+```
 
 ---
 
-**Note**: The external IP of a VM can change if you stop/restart it. For production, it is advisable to reserve a **Static External IP Address** in the "VPC Network > IP Addresses" section and attach it to your VM.
+# APPENDIX: Genesis Node Deployment (Network Creators Only)
 
-## MORE
+**WARNING**: This section is ONLY for the administrator deploying the network root. Do not follow these steps for a standard node.
 
-git clone https://github.com/lizardspace2/quantumresistantcoin.git
-cd quantumresistantcoin
+The Genesis Node requires a specific pre-generated key (`genesis_key.json`) that controls the initial 100M supply.
 
-## 4. Genesis Configuration
+### 1. Setup
+Follow the main guide up to **Step 3.B.1** (Cloning the repo). Do not launch the node yet.
 
-The Genesis node needs the private key that controls the initial 100 million coins.
-
-1.  **Import the key**: Transfer your `genesis_key.json` file (created locally) to the server.
-    *   *SSH Web Tip*: "Upload file" button in the top right.
-2.  **Place the key**:
+### 2. Import Genesis Key
+You must upload your local `genesis_key.json` to the server.
+1.  In the SSH Browser window, click **Upload File** (Gear icon).
+2.  Select `genesis_key.json`.
+3.  Move it to the expected location:
     ```bash
-    mv ~/genesis_key.json ~/NaivecoinStake-Proof-of-Stake-Core/
+    # The production config expects the key at the root of the project to mount it
+    mv ~/genesis_key.json ~/quantumresistantcoin/
     ```
 
-## 5. Launch
-
-Use the `docker-compose.prod.yml` file (already included):
+### 3. Launch Genesis Node
+Use the `docker-compose.prod.yml` file, which is hardcoded to mount `genesis_key.json`.
 
 ```bash
 sudo docker compose -f docker-compose.prod.yml up -d --build
 ```
 
-## 6. Verification
-
-The blockchain should start. Verify via the API:
-`http://EXTERNAL_IP:3001/blocks`
-
-You should see block #0 (Genesis) with your funds.
+### 4. Verification
+Check that the node has loaded the correct address (the one with 100M coins).
+```bash
+curl http://localhost:3001/balance
+```
+It should return `100000000`.
