@@ -24,6 +24,7 @@ import _ from 'lodash';
 import { UnspentTxOut, TxIn, Transaction, TxOut, signTxIn, getTransactionId } from './transaction';
 
 const privateKeyFile = 'node/wallet/private_key';
+const DILITHIUM_LEVEL = 3;
 
 // @noble/post-quantum helpers
 const buf2hex = (buffer: Uint8Array): string => {
@@ -56,29 +57,46 @@ const getPrivateFromWallet = (): string => {
     }
 };
 
-const getPublicFromWallet = (): string => {
-    const privateKey = getPrivateFromWallet();
-    const keyBytes = hex2buf(privateKey);
+const getPublicKey = (aPrivateKey: string): string => {
+    const keyBytes = hex2buf(aPrivateKey);
     let publicKey: Uint8Array;
 
+    // ML-DSA-65 SK is ~4032 bytes (Round 3) or similar.
+    // If length > 3000, we treat it as L3 SK.
+    if (keyBytes.length > 3000) {
+        // Assume L3 SK provided as raw hex
+        // We cannot derive PK from SK easily without library support or parsing SK structure.
+        // Assuming user provided correct key.
+        // If this is a problem (noble doesn't match), the user should provide JSON / Seed.
+        // Noble 0.5.4 ml_dsa65 sign doesn't return PK.
+        throw new Error("Cannot derive Public Key from raw ML-DSA-65 Secret Key bytes. Please use Seed or JSON KeyPair.");
+    }
+
     if (keyBytes.length === 32) {
-        // Default to Level 2
-        const keys = ml_dsa44.keygen(keyBytes);
+        // Default to ML-DSA-65 (L3) for seeds, as Genesis uses L3.
+        const keys = ml_dsa65.keygen(keyBytes);
         publicKey = keys.publicKey;
     } else {
+        // Fallback / Try L3 first
         try {
+            // If input is L2 SK (2560 bytes)
             if (keyBytes.length === 2560) {
-                throw new Error("Cannot derive PK from SK without re-keygen. Use Seed.");
+                throw new Error("L2 SK not supported for default L3 Genesis context.");
             }
-            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
+            // Default L3
+            const keys = ml_dsa65.keygen(keyBytes.slice(0, 32));
             publicKey = keys.publicKey;
         } catch (e) {
-            // Fallback: Try using first 32 bytes as seed for L2 (default migration)
             const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
             publicKey = keys.publicKey;
         }
     }
     return buf2hex(publicKey);
+};
+
+const getPublicFromWallet = (): string => {
+    const privateKey = getPrivateFromWallet();
+    return getPublicKey(privateKey);
 };
 
 // Generates a new wallet (overwrites existing)
@@ -114,29 +132,24 @@ const getDilithiumSync = () => {
     return {
         // Sign: (message, privateKey, level) -> signature
         sign: (message: Uint8Array, privateKey: Uint8Array, level: number) => {
-            // Level 2 (ML-DSA-44): Seed 32, SK 2560
-            // Level 3 (ML-DSA-65): Seed 32, SK 4032
-
-            let secretKey = privateKey;
-
-            // Case: Seed provided (32 bytes)
+            // Check for Seed (32 bytes) -> Default to L3
             if (privateKey.length === 32) {
-                if (level === 2) {
-                    const keys = ml_dsa44.keygen(privateKey);
-                    return ml_dsa44.sign(message, keys.secretKey);
-                } else {
-                    const keys = ml_dsa65.keygen(privateKey);
-                    return ml_dsa65.sign(message, keys.secretKey);
-                }
+                const keys = ml_dsa65.keygen(privateKey);
+                return ml_dsa65.sign(message, keys.secretKey);
             }
 
-            // Case: Full SK provided
+            // Check for L3 SK (~4032 bytes)
+            if (privateKey.length > 3000) {
+                return ml_dsa65.sign(message, privateKey);
+            }
+
+            // Check for L2 SK (2560 bytes)
             if (privateKey.length === 2560) {
                 return ml_dsa44.sign(message, privateKey);
             }
 
-            // Default/Fallback to ML-DSA-65
-            return ml_dsa65.sign(message, secretKey);
+            // Default fallback
+            return ml_dsa65.sign(message, privateKey);
         },
         // Verify: (signature, message, publicKey, level) -> boolean
         verify: (signature: Uint8Array, message: Uint8Array, publicKey: Uint8Array, level: number) => {
@@ -146,61 +159,6 @@ const getDilithiumSync = () => {
             return ml_dsa65.verify(signature, message, publicKey);
         }
     };
-};
-
-const DILITHIUM_LEVEL = 3;
-
-// --- Helper for createTransaction (Local version of getPublicFromWallet logic) ---
-const getPublicKey = (aPrivateKey: string): string => {
-    const keyBytes = hex2buf(aPrivateKey);
-    let publicKey: Uint8Array;
-
-    if (keyBytes.length === 32) {
-        const keys = ml_dsa44.keygen(keyBytes);
-        publicKey = keys.publicKey;
-    } else {
-        try {
-            if (keyBytes.length === 2560) {
-                throw new Error("Only Seed-based private keys supported for now");
-            }
-            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
-            publicKey = keys.publicKey;
-        } catch (e) {
-            const keys = ml_dsa44.keygen(keyBytes.slice(0, 32));
-            publicKey = keys.publicKey;
-        }
-    }
-    return buf2hex(publicKey);
-};
-
-const createTransaction = (receiverAddress: string, amount: number, privateKey: string, unspentTxOuts: UnspentTxOut[], txPool: Transaction[]): Transaction => {
-    const myAddress: string = getPublicKey(privateKey);
-    const myUnspentTxOutsA = unspentTxOuts.filter((uTxO: UnspentTxOut) => uTxO.address === myAddress);
-
-    const myUnspentTxOuts = filterTxPoolTxs(myUnspentTxOutsA, txPool);
-
-    const { includedUnspentTxOuts, leftOverAmount } = findTxOutsForAmount(amount, myUnspentTxOuts);
-
-    const toUnsignedTxIn = (uTxO: UnspentTxOut) => {
-        const txIn: TxIn = new TxIn();
-        txIn.txOutId = uTxO.txOutId;
-        txIn.txOutIndex = uTxO.txOutIndex;
-        return txIn;
-    };
-
-    const unsignedTxIns: TxIn[] = includedUnspentTxOuts.map(toUnsignedTxIn);
-
-    const tx: Transaction = new Transaction();
-    tx.txIns = unsignedTxIns;
-    tx.txOuts = createTxOuts(receiverAddress, myAddress, amount, leftOverAmount);
-    tx.id = getTransactionId(tx);
-
-    tx.txIns = tx.txIns.map((txIn: TxIn, index: number) => {
-        txIn.signature = signTxIn(tx, index, privateKey, unspentTxOuts);
-        return txIn;
-    });
-
-    return tx;
 };
 
 const filterTxPoolTxs = (unspentTxOuts: UnspentTxOut[], transactionPool: Transaction[]): UnspentTxOut[] => {
@@ -248,6 +206,36 @@ const createTxOuts = (receiverAddress: string, myAddress: string, amount: number
         const leftOverTx = new TxOut(myAddress, leftOverAmount);
         return [txOut1, leftOverTx];
     }
+};
+
+const createTransaction = (receiverAddress: string, amount: number, privateKey: string, unspentTxOuts: UnspentTxOut[], txPool: Transaction[]): Transaction => {
+    const myAddress: string = getPublicKey(privateKey);
+    const myUnspentTxOutsA = unspentTxOuts.filter((uTxO: UnspentTxOut) => uTxO.address === myAddress);
+
+    const myUnspentTxOuts = filterTxPoolTxs(myUnspentTxOutsA, txPool);
+
+    const { includedUnspentTxOuts, leftOverAmount } = findTxOutsForAmount(amount, myUnspentTxOuts);
+
+    const toUnsignedTxIn = (uTxO: UnspentTxOut) => {
+        const txIn: TxIn = new TxIn();
+        txIn.txOutId = uTxO.txOutId;
+        txIn.txOutIndex = uTxO.txOutIndex;
+        return txIn;
+    };
+
+    const unsignedTxIns: TxIn[] = includedUnspentTxOuts.map(toUnsignedTxIn);
+
+    const tx: Transaction = new Transaction();
+    tx.txIns = unsignedTxIns;
+    tx.txOuts = createTxOuts(receiverAddress, myAddress, amount, leftOverAmount);
+    tx.id = getTransactionId(tx);
+
+    tx.txIns = tx.txIns.map((txIn: TxIn, index: number) => {
+        txIn.signature = signTxIn(tx, index, privateKey, unspentTxOuts);
+        return txIn;
+    });
+
+    return tx;
 };
 
 export {
