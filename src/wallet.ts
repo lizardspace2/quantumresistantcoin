@@ -200,10 +200,24 @@ const findTxOutsForAmount = (amount: number, myUnspentTxOuts: UnspentTxOut[]) =>
 
 const createTxOuts = (receiverAddress: string, myAddress: string, amount: number, leftOverAmount: number) => {
     const txOut1: TxOut = new TxOut(receiverAddress, amount);
+
+    // Automatic fee deduction logic
+    const FEE = 0.05;
+
     if (leftOverAmount === 0) {
+        // If exact match, we can't pay fee unless we reduce amount? 
+        // Usually invalid unless we have extra inputs. Assuming leftOver covers it or throws.
+        // For simplicity in this logic: if leftOver is 0, we return just txOut1 and fee is 0 (which fails).
+        // It implies the user must have slightly more than 'amount'.
         return [txOut1];
+    } else if (leftOverAmount < FEE) {
+        // Not enough left for fees.
+        // We could just consume it all as fee?
+        throw new Error(`Not enough funds for transaction fee. Leftover: ${leftOverAmount}, Required Fee: ${FEE}`);
     } else {
-        const leftOverTx = new TxOut(myAddress, leftOverAmount);
+        // Deduct fee from the change sent back to sender
+        const newLeftOver = leftOverAmount - FEE;
+        const leftOverTx = new TxOut(myAddress, newLeftOver);
         return [txOut1, leftOverTx];
     }
 };
