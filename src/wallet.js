@@ -44,7 +44,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createTransaction = exports.DILITHIUM_LEVEL = exports.getDilithiumSync = exports.findUnspentTxOuts = exports.getBalance = exports.getPublicFromWallet = exports.getPrivateFromWallet = exports.deleteWallet = exports.initWallet = void 0;
+exports.getPublicKey = exports.createTransaction = exports.DILITHIUM_LEVEL = exports.getDilithiumSync = exports.findUnspentTxOuts = exports.getBalance = exports.getPublicFromWallet = exports.getPrivateFromWallet = exports.deleteWallet = exports.initWallet = void 0;
 const crypto = __importStar(require("crypto"));
 const ml_dsa_1 = require("./noble/ml-dsa");
 const fs_1 = require("fs");
@@ -196,6 +196,7 @@ const getPublicKey = (aPrivateKey) => {
     }
     return buf2hex(publicKey);
 };
+exports.getPublicKey = getPublicKey;
 const createTransaction = (receiverAddress, amount, privateKey, unspentTxOuts, txPool) => {
     const myAddress = getPublicKey(privateKey);
     const myUnspentTxOutsA = unspentTxOuts.filter((uTxO) => uTxO.address === myAddress);

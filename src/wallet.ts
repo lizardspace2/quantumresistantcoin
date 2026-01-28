@@ -255,5 +255,5 @@ export {
     getPrivateFromWallet, getPublicFromWallet,
     getBalance, findUnspentTxOuts,
     getDilithiumSync, DILITHIUM_LEVEL,
-    createTransaction
+    createTransaction, getPublicKey
 };

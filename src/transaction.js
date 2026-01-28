@@ -48,6 +48,7 @@ exports.validateBlockTransactions = exports.hasDuplicates = exports.getPublicKey
 const CryptoJS = __importStar(require("crypto-js"));
 const lodash_1 = __importDefault(require("lodash"));
 const wallet_1 = require("./wallet");
+Object.defineProperty(exports, "getPublicKey", { enumerable: true, get: function () { return wallet_1.getPublicKey; } });
 const validation_errors_1 = require("./validation_errors");
 const COINBASE_AMOUNT_INITIAL = 50;
 const HALVING_INTERVAL = 100000;
@@ -258,7 +259,7 @@ const signTxIn = (transaction, txInIndex, privateKey, aUnspentTxOuts) => {
         throw Error();
     }
     const referencedAddress = referencedUnspentTxOut.address;
-    if (getPublicKey(privateKey) !== referencedAddress) {
+    if ((0, wallet_1.getPublicKey)(privateKey) !== referencedAddress) {
         console.log('trying to sign an input with private' +
             ' key that does not match the address that is referenced in txIn');
         throw Error();
@@ -319,24 +320,6 @@ const processTransactions = (aTransactions, aUnspentTxOuts, blockIndex) => {
     return updateUnspentTxOuts(aTransactions, aUnspentTxOuts);
 };
 exports.processTransactions = processTransactions;
-const getPublicKey = (aPrivateKey) => {
-    // This helper was confusing in original code. 
-    // It parsed JSON to get publicKey.
-    // If we want consistency, we should rely on wallet or re-derive.
-    try {
-        const keyPair = JSON.parse(aPrivateKey);
-        return Buffer.from(keyPair.publicKey).toString('hex'); // Original looked like this?
-    }
-    catch (error) {
-        // If raw hex, we can't easily know PK without re-deriving.
-        // Assuming this function is used to check 'referencedAddress', 
-        // checking against wallet or deriving is better.
-        // For now, let's leave it as is, assuming inputs are JSON KeyPairs as designed originally.
-        console.log('error getting public key: ' + error.message);
-        throw error;
-    }
-};
-exports.getPublicKey = getPublicKey;
 const isValidTxInStructure = (txIn) => {
     if (txIn == null) {
         console.log('txIn is null');

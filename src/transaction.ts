@@ -18,7 +18,7 @@
  */
 import * as CryptoJS from 'crypto-js';
 import _ from 'lodash';
-import { getDilithiumSync, DILITHIUM_LEVEL } from './wallet';
+import { getDilithiumSync, DILITHIUM_LEVEL, getPublicKey } from './wallet';
 import { ValidationError, ValidationErrorCode } from './validation_errors';
 
 const COINBASE_AMOUNT_INITIAL: number = 50;
@@ -342,22 +342,7 @@ const processTransactions = (aTransactions: Transaction[], aUnspentTxOuts: Unspe
     return updateUnspentTxOuts(aTransactions, aUnspentTxOuts);
 };
 
-const getPublicKey = (aPrivateKey: string): string => {
-    // This helper was confusing in original code. 
-    // It parsed JSON to get publicKey.
-    // If we want consistency, we should rely on wallet or re-derive.
-    try {
-        const keyPair = JSON.parse(aPrivateKey);
-        return Buffer.from(keyPair.publicKey).toString('hex'); // Original looked like this?
-    } catch (error) {
-        // If raw hex, we can't easily know PK without re-deriving.
-        // Assuming this function is used to check 'referencedAddress', 
-        // checking against wallet or deriving is better.
-        // For now, let's leave it as is, assuming inputs are JSON KeyPairs as designed originally.
-        console.log('error getting public key: ' + error.message);
-        throw error;
-    }
-};
+
 
 const isValidTxInStructure = (txIn: TxIn): boolean => {
     if (txIn == null) {
