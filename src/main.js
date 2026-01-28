@@ -276,8 +276,8 @@ const initQuantum = async () => {
     (0, p2p_1.initP2PServer)(p2pPort);
     initAutoMining();
     const bootNodes = [
-        'ws://34.58.38.118:6001',
-        'ws://34.70.214.237:6001' // Explorer Node (Public)
+        'ws://35.225.236.73:6001',
+        'ws://34.68.204.103:6001' // Explorer Node (node-explorer)
     ];
     let peers = bootNodes;
     if (process.env.PEERS) {
