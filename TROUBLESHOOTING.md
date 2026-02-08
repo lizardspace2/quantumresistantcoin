@@ -2,6 +2,21 @@
 
 ## Node Synchronization Issues
 
+If your node does not find peers:
+
+1.  **Check Firewall**: Ensure ports 6001 (P2P) and 3001 (API) are open.
+    *   **GCP**: `gcloud compute firewall-rules create allow-quantix-ports --rules=tcp:3001,tcp:6001`
+    *   **AWS**: Check Security Groups.
+2.  **Test Connectivity**: Log into your server and try to reach a known peer.
+    ```bash
+    nc -zv 35.225.236.73 6001
+    ```
+3.  **Check Logs**: Look for `connection failed` or `websocket error`.
+4.  **Force Reconnect**:
+    ```bash
+    curl -H "Content-Type: application/json" --data '{"peer" : "ws://35.225.236.73:6001"}' http://localhost:3001/addPeer
+    ```
+
 If a peer node (e.g., Node 3) is connected but not synchronizing with the main node, follow these steps to diagnose and fix the issue.
 
 ### 1. Check Connectivity

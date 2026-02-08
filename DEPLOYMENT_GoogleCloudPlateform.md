@@ -38,7 +38,21 @@ Your node needs to communicate with the world. By default, Google Cloud blocks m
 *   **Port 3001 (HTTP API)**: Used to query your node (e.g., getting your balance, checking block height).
 *   **Port 6001 (P2P WebSocket)**: Used by the node to talk to other nodes (peers) to receive new blocks and transactions.
 
-**Steps:**
+### Option A: Using `gcloud` (Recommended)
+
+Run this command in your Cloud Shell:
+
+```bash
+gcloud compute firewall-rules create allow-quantix-ports \
+    --direction=INGRESS \
+    --priority=1000 \
+    --network=default \
+    --action=ALLOW \
+    --rules=tcp:3001,tcp:6001 \
+    --source-ranges=0.0.0.0/0
+```
+
+### Option B: Using GCP Console
 
 1.  In the console, search for "Firewall policies" or go to **VPC network** > **Firewall**.
 2.  Click **Create Firewall Rule**.
@@ -215,3 +229,45 @@ Check that the node has loaded the correct address (the one with 100M coins).
 curl http://localhost:3001/balance
 ```
 It should return `100000000`.
+
+---
+
+## 7. Troubleshooting
+
+If your node is not connecting or syncing, try these steps.
+
+### A. Node Not Connecting to Peers
+If `curl http://localhost:3001/peers` returns `0` or fails:
+
+1.  **Check Firewall**: Verify ports 3001 and 6001 are open.
+    ```bash
+    # Run this in Cloud Shell
+    gcloud compute firewall-rules describe allow-quantix-ports
+    ```
+2.  **Test Connectivity**: Log into your node and try to reach the bootnode.
+    ```bash
+    # Install net-tools if needed: sudo apt install netcat
+    nc -zv 35.225.236.73 6001
+    ```
+    If this fails, the firewall is closed.
+
+3.  **Force Reconnection**: Sometimes docker containers get stuck with stale network state.
+    ```bash
+    sudo docker compose -f docker-compose-peer.yml down
+    sudo docker compose -f docker-compose-peer.yml up -d
+    ```
+
+### B. "Command npm not found" or Code Not Updating
+If `git pull` doesn't update your running node:
+
+1.  **Docker Build Required**: You cannot run `npm` directly on the server. You must rebuild the Docker image.
+    ```bash
+    git pull
+    sudo docker compose -f docker-compose-peer.yml up -d --build
+    ```
+
+### C. Check Logs for Errors
+```bash
+sudo docker compose -f docker-compose-peer.yml logs --tail 50 -f
+```
+Look for `connection failed` or `EADDRINUSE` (port conflict).
