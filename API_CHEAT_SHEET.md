@@ -214,6 +214,17 @@ Replace `ADDRESS` with the public key to check.
 curl -s http://localhost:3001/address/ADDRESS | jq '[.unspentTxOuts[].amount] | add'
 ```
 
+
+### Debug: Check if transaction is pending
+```bash
+curl -s http://localhost:3001/transactionPool
+```
+
+### Debug: Check recent blocks (to see if it was mined)
+```bash
+curl -s http://localhost:3001/blocks | jq '.[-3:]'
+```
+
 ### Simulate a block with transaction (Special Minting)
 Generates a block containing a specific transaction (useful for debug/tests).
 ```bash

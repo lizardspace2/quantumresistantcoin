@@ -202,7 +202,7 @@ const createTxOuts = (receiverAddress: string, myAddress: string, amount: number
     const txOut1: TxOut = new TxOut(receiverAddress, amount);
 
     // Automatic fee deduction logic
-    const FEE = 0.00001;
+    const FEE = 0.000000001;
 
     if (leftOverAmount === 0) {
         // If exact match, we can't pay fee unless we reduce amount? 

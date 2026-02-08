@@ -146,7 +146,7 @@ const validateTransaction = (transaction: Transaction, aUnspentTxOuts: UnspentTx
         }
     }
 
-    if (getTxFee(transaction, aUnspentTxOuts) < 0.00001) {
+    if (getTxFee(transaction, aUnspentTxOuts) < 0.000000001) {
         throw new ValidationError('transaction fee too low: ' + getTxFee(transaction, aUnspentTxOuts), ValidationErrorCode.INVALID_FEE, false);
     }
 
