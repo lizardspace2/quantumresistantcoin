@@ -9,6 +9,13 @@ Here is a list of the most useful commands to interact with your Quantix node vi
 curl http://localhost:3001/address
 ```
 
+
+### View your Private Key (Seed)
+⚠️ **WARNING**: Retrieve the private key (seed) of the node wallet. Use with caution.
+```bash
+curl -s http://localhost:3001/private-key | jq -r '.privateKey'
+```
+
 ### View Address Details (UTXOs)
 Get the list of Unspent Transaction Outputs (UTXOs) for a specific address. This represents the "state" of the address on the blockchain.
 
@@ -115,7 +122,15 @@ Forces the node to try mining a block immediately.
 curl -H "Content-type:application/json" --data '{}' http://localhost:3001/mintBlock
 ```
 
+
+### View Genesis Public Key (Address)
+Extracts the address that received the mining reward (premine) in the genesis block.
+```bash
+curl -s http://localhost:3001/block/index/0 | jq -r '.data[0].txOuts[0].address'
+```
+
 ---
+
 
 ## 🌐 Network (P2P)
 

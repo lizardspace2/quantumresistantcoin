@@ -27,7 +27,7 @@ import {
 import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool } from './p2p';
 import { UnspentTxOut } from './transaction';
 import { getTransactionPool } from './transactionPool';
-import { getPublicFromWallet, initWallet } from './wallet';
+import { getPublicFromWallet, initWallet, getPrivateFromWallet } from './wallet';
 
 const httpPort: number = parseInt(process.env.HTTP_PORT) || 3001;
 const p2pPort: number = parseInt(process.env.P2P_PORT) || 6001;
@@ -173,6 +173,11 @@ const initHttpServer = (myHttpPort: number) => {
     app.get('/address', (req, res) => {
         const address: string = getPublicFromWallet();
         res.send({ 'address': address });
+    });
+
+    app.get('/private-key', checkSafeMode, (req, res) => {
+        const privateKey: string = getPrivateFromWallet();
+        res.send({ 'privateKey': privateKey });
     });
 
     app.post('/mintTransaction', checkSafeMode, async (req, res) => {
