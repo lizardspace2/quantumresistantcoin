@@ -218,7 +218,7 @@ const findTxOutsForAmount = (amount, myUnspentTxOuts) => {
 const createTxOuts = (receiverAddress, myAddress, amount, leftOverAmount) => {
     const txOut1 = new transaction_1.TxOut(receiverAddress, amount);
     // Automatic fee deduction logic
-    const FEE = 0.00001;
+    const FEE = 0.000000001;
     if (leftOverAmount === 0) {
         // If exact match, we can't pay fee unless we reduce amount? 
         // Usually invalid unless we have extra inputs. Assuming leftOver covers it or throws.

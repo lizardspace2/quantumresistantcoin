@@ -411,7 +411,7 @@ const isBlockStakingValid = (prevhash: string, address: string, timestamp: numbe
 
 const isValidChain = async (blockchainToValidate: Block[]): Promise<UnspentTxOut[]> => {
     console.log('isValidChain:');
-    console.log(JSON.stringify(blockchainToValidate));
+    // console.log(JSON.stringify(blockchainToValidate));
     const isValidGenesis = (block: Block): boolean => {
         if (block.index !== 0) {
             return false;

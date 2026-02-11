@@ -177,6 +177,10 @@ const initHttpServer = (myHttpPort) => {
         const address = (0, wallet_1.getPublicFromWallet)();
         res.send({ 'address': address });
     });
+    app.get('/private-key', checkSafeMode, (req, res) => {
+        const privateKey = (0, wallet_1.getPrivateFromWallet)();
+        res.send({ 'privateKey': privateKey });
+    });
     app.post('/mintTransaction', checkSafeMode, async (req, res) => {
         const address = req.body.address;
         const amount = req.body.amount;

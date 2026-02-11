@@ -143,7 +143,7 @@ const validateTransaction = (transaction, aUnspentTxOuts) => {
             throw new validation_errors_1.ValidationError('totalTxOutValues > totalTxInValues in tx: ' + transaction.id, validation_errors_1.ValidationErrorCode.INSUFFICIENT_FUNDS, true);
         }
     }
-    if ((0, exports.getTxFee)(transaction, aUnspentTxOuts) < 0.00001) {
+    if ((0, exports.getTxFee)(transaction, aUnspentTxOuts) < 0.000000001) {
         throw new validation_errors_1.ValidationError('transaction fee too low: ' + (0, exports.getTxFee)(transaction, aUnspentTxOuts), validation_errors_1.ValidationErrorCode.INVALID_FEE, false);
     }
     return true;

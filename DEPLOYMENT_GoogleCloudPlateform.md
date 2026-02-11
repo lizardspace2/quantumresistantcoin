@@ -50,6 +50,13 @@ gcloud compute firewall-rules create allow-quantix-ports \
     --action=ALLOW \
     --rules=tcp:3001,tcp:6001 \
     --source-ranges=0.0.0.0/0
+
+    # (Conditional) If you use GCP Cloud Shell or IAP for SSH, you might need to allow Google's range:
+    gcloud compute firewall-rules create allow-ssh-ingress-from-iap \
+    --direction=INGRESS \
+    --action=ALLOW \
+    --rules=tcp:22 \
+    --source-ranges=35.235.240.0/20
 ```
 
 ### Option B: Using GCP Console

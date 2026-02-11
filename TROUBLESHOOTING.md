@@ -1,50 +1,34 @@
-# Troubleshooting Guide: Quantix (QTX)
 
-## Node Synchronization Issues
+# Troubleshooting
 
-If your node does not find peers:
+## Node not syncing?
 
-1.  **Check Firewall**: Ensure ports 6001 (P2P) and 3001 (API) are open.
-    *   **GCP**: `gcloud compute firewall-rules create allow-quantix-ports --rules=tcp:3001,tcp:6001`
-    *   **AWS**: Check Security Groups.
-2.  **Test Connectivity**: Log into your server and try to reach a known peer.
-    ```bash
-    nc -zv 35.225.236.73 6001
-    ```
-3.  **Check Logs**: Look for `connection failed` or `websocket error`.
-4.  **Force Reconnect**:
-    ```bash
-    curl -H "Content-Type: application/json" --data '{"peer" : "ws://35.225.236.73:6001"}' http://localhost:3001/addPeer
-    ```
-
-If a peer node (e.g., Node 3) is connected but not synchronizing with the main node, follow these steps to diagnose and fix the issue.
-
-### 1. Check Connectivity
-Ensure the nodes are connected.
+### 1. Check Peers
+First, check if you are connected to any peers.
 ```bash
 curl -s http://localhost:3001/peers
 ```
-If the list is empty, add the peer manually using your deployment guide.
+If the list is empty `[]` or only contains `::ffff:...`, verification failed or connection is blocked.
 
-### 2. Check for a Chain Fork
-If the running node is stuck at a specific block height (e.g., 314) while the main node is ahead, check if they are on the same chain. Compare the hash of the last block the stuck node possesses.
-
-**Get the last block index from the stuck node:**
+### 2. Check Connection to Main Node
+Try to manually reach the genesis node:
 ```bash
-curl -s http://localhost:3001/blocks | jq length
-# Example output: 314 (This means it has blocks 0 to 313)
+nc -zv 35.225.236.73 6001
 ```
+*   **Success**: "Connection to ... succeeded!" -> Network is fine. Move to Step 3.
+*   **Failure**: "Connection timed out" -> Firewall issue.
+    *   Check your VM firewall (is port 6001 open?)
+    *   Check if your ISP/Provider allows outgoing traffic on 6001.
 
-**Compare the hash of the last block (index 313) on BOTH nodes:**
+### 3. Compare Block Hashes
+Sometimes a node gets stuck on a bad fork or old data. Compare your latest block hash (from `/info`) with the main node.
 
-On the **Stuck Node**:
 ```bash
-curl -s http://localhost:3001/blocks | jq '.[313].hash'
-```
+# Your Node
+curl -s http://localhost:3001/info | jq .
 
-On the **Healthy Node**:
-```bash
-curl -s http://localhost:3001/blocks | jq '.[313].hash'
+# Main Node
+curl -s http://35.225.236.73:3001/info | jq .
 ```
 
 *   **If hashes are DIFFERENT**: The node is on a fork. You must reset it.
@@ -52,10 +36,10 @@ curl -s http://localhost:3001/blocks | jq '.[313].hash'
     *   Remove the data directory (or volume).
     *   Restart the container to resync from scratch.
 
-*   **If hashes are IDENTICAL**: The node is just stuck (handshake missed). Proceed to step 3.
+*   **If hashes are IDENTICAL**: The node is just stuck (handshake missed). Proceed to step 4.
 
-### 3. Force Synchronization (Restart)
-If the hashes match, restarting the node will force a new handshake and trigger synchronization immediately.
+### 4. Force Synchronization (Restart)
+If the hashes match but height is stuck, restarting the node will force a new handshake and trigger synchronization immediately.
 
 **Identify the container name:**
 ```bash
@@ -68,7 +52,21 @@ sudo docker restart <container_name>
 # Example: sudo docker restart quantix-node
 ```
 
-Wait 10-15 seconds and check if the block count increases:
+### 5. Check Docker Logs
+If all else fails, the logs usually tell the truth.
 ```bash
-curl -s http://localhost:3001/blocks | jq length
+sudo docker logs --tail 50 -f <container_name>
+```
+Look for "Recursive error", "p2p error", or "Rejected".
+
+### 6. GCP SSH Error: "Code: 4003 failed to connect to backend"
+This means Google's Identity-Aware Proxy (IAP) cannot reach your VM on port 22. You need to allow their specific IP range.
+
+**Fix:** Run this in your local terminal or Cloud Shell:
+```bash
+gcloud compute firewall-rules create allow-ssh-ingress-from-iap \
+  --direction=INGRESS \
+  --action=ALLOW \
+  --rules=tcp:22 \
+  --source-ranges=35.235.240.0/20
 ```

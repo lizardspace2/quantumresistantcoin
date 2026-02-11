@@ -368,7 +368,7 @@ const isBlockStakingValid = (prevhash, address, timestamp, balance, difficulty, 
 };
 const isValidChain = async (blockchainToValidate) => {
     console.log('isValidChain:');
-    console.log(JSON.stringify(blockchainToValidate));
+    // console.log(JSON.stringify(blockchainToValidate));
     const isValidGenesis = (block) => {
         if (block.index !== 0) {
             return false;
