@@ -3,3 +3,4 @@ genesis_key.json
 node/
 dist/
 *.log
+data/
