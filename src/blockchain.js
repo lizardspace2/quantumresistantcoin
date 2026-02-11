@@ -395,7 +395,8 @@ const isValidChain = async (blockchainToValidate) => {
     }
     let aUnspentTxOuts = [];
     for (let i = 0; i < blockchainToValidate.length; i++) {
-        if (i % 10 === 0) {
+        if (i % 100 === 0) {
+            console.log(`Validating block ${i}/${blockchainToValidate.length}`);
             await (0, utils_async_1.yieldToEventLoop)();
         }
         const currentBlock = blockchainToValidate[i];
