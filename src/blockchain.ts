@@ -441,7 +441,8 @@ const isValidChain = async (blockchainToValidate: Block[]): Promise<UnspentTxOut
     let aUnspentTxOuts: UnspentTxOut[] = [];
 
     for (let i = 0; i < blockchainToValidate.length; i++) {
-        if (i % 10 === 0) {
+        if (i % 100 === 0) {
+            console.log(`Validating block ${i}/${blockchainToValidate.length}`);
             await yieldToEventLoop();
         }
 
