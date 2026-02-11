@@ -255,7 +255,7 @@ const handleBlockchainResponse = async (receivedBlocks: Block[], ws: WebSocket) 
             }
         }
     } else {
-        console.log('received blockchain is not longer than received blockchain. Do nothing');
+        // console.log('received blockchain is not longer than received blockchain. Do nothing');
     }
 };
 
