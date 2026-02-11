@@ -505,19 +505,31 @@ const getCumulativeDifficulty = (aBlockchain: Block[]): BigNumber => {
         .reduce((a, b) => a.plus(b), new BigNumber(0));
 };
 
-const replaceChain = async (newBlocks: Block[]) => {
-    const newUnspentTxOuts = await isValidChain(newBlocks);
-    if (newUnspentTxOuts !== null &&
-        getCumulativeDifficulty(newBlocks).gt(getCumulativeDifficulty(blockchain))) {
-        console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
+let isSyncing = false;
 
-        blockchain = newBlocks;
-        setUnspentTxOuts(newUnspentTxOuts);
-        updateTransactionPool(unspentTxOuts);
-        broadcastLatest();
-        saveBlockchain();
-    } else {
-        console.log('Received blockchain invalid or not heavier');
+const replaceChain = async (newBlocks: Block[]) => {
+    if (isSyncing) {
+        console.log('Synchronization in progress, ignoring new chain');
+        return;
+    }
+
+    isSyncing = true;
+    try {
+        const newUnspentTxOuts = await isValidChain(newBlocks);
+        if (newUnspentTxOuts !== null &&
+            getCumulativeDifficulty(newBlocks).gt(getCumulativeDifficulty(blockchain))) {
+            console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
+
+            blockchain = newBlocks;
+            setUnspentTxOuts(newUnspentTxOuts);
+            updateTransactionPool(unspentTxOuts);
+            broadcastLatest();
+            saveBlockchain();
+        } else {
+            console.log('Received blockchain invalid or not heavier');
+        }
+    } finally {
+        isSyncing = false;
     }
 };
 
