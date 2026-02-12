@@ -10,9 +10,10 @@ services:
       - HTTP_PORT=3001
       - P2P_PORT=6001
       - SAFE_MODE=true
-      # - PEERS=ws://10.128.0.7:6001
-      # No PRIVATE_KEY env var implies using a fresh/random key if implementation supports it, 
-      # or we maps to a non-mounted path. The node code generates one if missing.
+    deploy:
+      resources:
+        limits:
+          memory: 600M
     volumes:
       # We intentionally DO NOT mount the wallet directory to avoid using the user's private key.
       # The node will generate a temporary key for this session (which is fine for a read-only node).
