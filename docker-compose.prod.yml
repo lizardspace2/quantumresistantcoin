@@ -12,6 +12,11 @@ services:
       - P2P_PORT=6001
       - PEERS=
       - PRIVATE_KEY=node/wallet/private_key
+    deploy:
+      resources:
+        limits:
+          memory: 800M
+          # memory-swap: 2G # Only works if swap is enabled on host
     volumes:
       - ./genesis_key.json:/app/node/wallet/private_key
       - ./node/data:/app/data
