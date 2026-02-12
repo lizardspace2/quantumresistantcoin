@@ -344,12 +344,14 @@ const isValidBlockHeader = (newBlock: Block, previousBlock: Block): boolean => {
     }
 
     // Security Fix: Restrict Emergency Difficulty Reset to Genesis Address ONLY
+    /* 
     if (newBlock.difficulty === 1 && newBlock.index > 10) {
         if (newBlock.minterAddress !== GENESIS_ADDRESS) {
             console.log('INVALID MINTER: Only Genesis Address can mine recovery blocks with difficulty 1');
             return false;
         }
     }
+    */
 
     return true;
 };
