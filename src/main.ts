@@ -240,7 +240,15 @@ const initHttpServer = (myHttpPort: number) => {
     });
 
     app.get('/peers', (req, res) => {
-        res.send(getSockets().map((s: any) => s._socket.remoteAddress + ':' + s._socket.remotePort));
+        const peers = getSockets()
+            .map((s: any) => {
+                if (s && s._socket && s._socket.remoteAddress && s._socket.remotePort) {
+                    return s._socket.remoteAddress + ':' + s._socket.remotePort;
+                }
+                return null;
+            })
+            .filter((peer) => peer !== null);
+        res.send(peers);
     });
     app.post('/addPeer', checkSafeMode, (req, res) => {
         connectToPeers(req.body.peer);

@@ -239,7 +239,15 @@ const initHttpServer = (myHttpPort) => {
         }
     });
     app.get('/peers', (req, res) => {
-        res.send((0, p2p_1.getSockets)().map((s) => s._socket.remoteAddress + ':' + s._socket.remotePort));
+        const peers = (0, p2p_1.getSockets)()
+            .map((s) => {
+            if (s && s._socket && s._socket.remoteAddress && s._socket.remotePort) {
+                return s._socket.remoteAddress + ':' + s._socket.remotePort;
+            }
+            return null;
+        })
+            .filter((peer) => peer !== null);
+        res.send(peers);
     });
     app.post('/addPeer', checkSafeMode, (req, res) => {
         (0, p2p_1.connectToPeers)(req.body.peer);

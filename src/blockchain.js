@@ -313,12 +313,14 @@ const isValidBlockHeader = (newBlock, previousBlock) => {
         return false;
     }
     // Security Fix: Restrict Emergency Difficulty Reset to Genesis Address ONLY
+    /*
     if (newBlock.difficulty === 1 && newBlock.index > 10) {
         if (newBlock.minterAddress !== GENESIS_ADDRESS) {
             console.log('INVALID MINTER: Only Genesis Address can mine recovery blocks with difficulty 1');
             return false;
         }
     }
+    */
     return true;
 };
 exports.isValidBlockHeader = isValidBlockHeader;
@@ -459,19 +461,30 @@ const getCumulativeDifficulty = (aBlockchain) => {
         .reduce((a, b) => a.plus(b), new bignumber_js_1.BigNumber(0));
 };
 exports.getCumulativeDifficulty = getCumulativeDifficulty;
+let isSyncing = false;
 const replaceChain = async (newBlocks) => {
-    const newUnspentTxOuts = await isValidChain(newBlocks);
-    if (newUnspentTxOuts !== null &&
-        getCumulativeDifficulty(newBlocks).gt(getCumulativeDifficulty(blockchain))) {
-        console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
-        blockchain = newBlocks;
-        setUnspentTxOuts(newUnspentTxOuts);
-        (0, transactionPool_1.updateTransactionPool)(unspentTxOuts);
-        (0, p2p_1.broadcastLatest)();
-        saveBlockchain();
+    if (isSyncing) {
+        console.log('Synchronization in progress, ignoring new chain');
+        return;
     }
-    else {
-        console.log('Received blockchain invalid or not heavier');
+    isSyncing = true;
+    try {
+        const newUnspentTxOuts = await isValidChain(newBlocks);
+        if (newUnspentTxOuts !== null &&
+            getCumulativeDifficulty(newBlocks).gt(getCumulativeDifficulty(blockchain))) {
+            console.log('Received blockchain is valid. Replacing current blockchain with received blockchain');
+            blockchain = newBlocks;
+            setUnspentTxOuts(newUnspentTxOuts);
+            (0, transactionPool_1.updateTransactionPool)(unspentTxOuts);
+            (0, p2p_1.broadcastLatest)();
+            saveBlockchain();
+        }
+        else {
+            console.log('Received blockchain invalid or not heavier');
+        }
+    }
+    finally {
+        isSyncing = false;
     }
 };
 exports.replaceChain = replaceChain;

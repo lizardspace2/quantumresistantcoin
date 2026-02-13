@@ -247,7 +247,7 @@ const handleBlockchainResponse = async (receivedBlocks, ws) => {
         }
     }
     else {
-        console.log('received blockchain is not longer than received blockchain. Do nothing');
+        // console.log('received blockchain is not longer than received blockchain. Do nothing');
     }
 };
 const handleBinHeadersResponse = async (receivedHeaders, ws) => {
