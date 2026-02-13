@@ -291,7 +291,9 @@ const initQuantum = async () => {
     initWallet();
     initHttpServer(httpPort);
     initP2PServer(p2pPort);
-    initAutoMining();
+    if (process.env.ENABLE_MINING === 'true') {
+        initAutoMining();
+    }
 
     const bootNodes = [
         'ws://35.225.236.73:6001',   // Genesis Node (ip-node-3)
