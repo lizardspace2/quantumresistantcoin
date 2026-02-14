@@ -13,6 +13,7 @@ import { peerManager } from './peerManager';
 const sockets: WebSocket[] = [];
 const knownPeers: Set<string> = new Set();
 const pendingPeers: Set<string> = new Set();
+const peerHeights: Map<WebSocket, number> = new Map();
 
 
 enum MessageType {
@@ -145,6 +146,13 @@ const initMessageHandler = (ws: WebSocket) => {
     });
 };
 
+const getPeerInfo = () => {
+    return sockets.map(s => ({
+        url: (s as any).url || (s as any)._socket.remoteAddress + ':' + (s as any)._socket.remotePort,
+        height: peerHeights.get(s) || 0
+    }));
+};
+
 const write = (ws: WebSocket, message: Message): void => ws.send(JSON.stringify(message));
 const broadcast = (message: Message): void => sockets.forEach((socket) => write(socket, message));
 
@@ -193,6 +201,12 @@ const initErrorHandler = (ws: WebSocket) => {
     ws.on('error', () => closeConnection(ws));
 };
 
+const closeConnection = (myWs: WebSocket) => {
+    console.log('connection failed to peer: ' + (myWs as any).url);
+    sockets.splice(sockets.indexOf(myWs), 1);
+    peerHeights.delete(myWs);
+};
+
 const banPeer = (ws: WebSocket, reason: string) => {
     const ip = (ws as any)._socket.remoteAddress;
     console.log(`Banning peer ${ip} for: ${reason}`);
@@ -217,6 +231,7 @@ const handleBlockchainResponse = async (receivedBlocks: Block[], ws: WebSocket) 
         return;
     }
     const latestBlockReceived: Block = receivedBlocks[receivedBlocks.length - 1];
+    peerHeights.set(ws, latestBlockReceived.index);
     if (!isValidBlockStructure(latestBlockReceived)) {
         console.log('block structuture not valid');
         return;
@@ -311,4 +326,4 @@ const broadCastTransactionPool = () => {
     broadcast(responseTransactionPoolMsg());
 };
 
-export { connectToPeers, broadcastLatest, broadCastTransactionPool, initP2PServer, getSockets };
+export { connectToPeers, broadcastLatest, broadCastTransactionPool, initP2PServer, getSockets, getPeerInfo };

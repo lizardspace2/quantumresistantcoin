@@ -22,9 +22,9 @@ import _ from 'lodash';
 import {
     Block, generateNextBlock, generatenextBlockWithTransaction, generateRawNextBlock, getAccountBalance,
     getBlockchain, getBlockHeaders, getMyUnspentTransactionOutputs, getUnspentTxOuts, sendTransaction, initGenesisBlock,
-    getTotalSupply, getAllBalances, handleReceivedTransaction
+    getTotalSupply, getAllBalances, handleReceivedTransaction, getLatestBlock
 } from './blockchain';
-import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool } from './p2p';
+import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool, getPeerInfo } from './p2p';
 import { UnspentTxOut } from './transaction';
 import { getTransactionPool } from './transactionPool';
 import { getPublicFromWallet, initWallet, getPrivateFromWallet } from './wallet';
@@ -258,6 +258,17 @@ const initHttpServer = (myHttpPort: number) => {
     app.post('/stop', checkSafeMode, (req, res) => {
         res.send({ 'msg': 'stopping server' });
         process.exit();
+    });
+
+    app.get('/debug', (req, res) => {
+        res.send({
+            height: getLatestBlock().index,
+            isSyncing: false, // TODO: Expose isSyncing from blockchain.ts
+            peers: getPeerInfo().map(p => ({
+                url: p.url,
+                height: p.height
+            }))
+        });
     });
 
     app.listen(myHttpPort, () => {
