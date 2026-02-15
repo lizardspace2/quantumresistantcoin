@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSyncStatus = exports.getAllBalances = exports.getTotalSupply = exports.isValidBlockHeader = exports.getBlockHeaders = exports.initGenesisBlock = exports.getCumulativeDifficulty = exports.addBlockToChain = exports.replaceChain = exports.isValidBlockStructure = exports.getAccountBalance = exports.getMyUnspentTransactionOutputs = exports.handleReceivedTransaction = exports.generatenextBlockWithTransaction = exports.generateNextBlock = exports.generateRawNextBlock = exports.sendTransaction = exports.getLatestBlock = exports.getUnspentTxOuts = exports.getBlockchain = exports.Block = void 0;
+exports.getSyncStatus = exports.getAllBalances = exports.getTotalSupply = exports.getBlocks = exports.isValidBlockHeader = exports.getBlockHeaders = exports.initGenesisBlock = exports.getCumulativeDifficulty = exports.addBlockToChain = exports.replaceChain = exports.isValidBlockStructure = exports.getAccountBalance = exports.getMyUnspentTransactionOutputs = exports.handleReceivedTransaction = exports.generatenextBlockWithTransaction = exports.generateNextBlock = exports.generateRawNextBlock = exports.sendTransaction = exports.getLatestBlock = exports.getUnspentTxOuts = exports.getBlockchain = exports.Block = void 0;
 /*
  * Copyright 2026 lizrdspace2
  *
@@ -191,6 +191,13 @@ const getBlockHeaders = (start, end) => {
     }));
 };
 exports.getBlockHeaders = getBlockHeaders;
+const getBlocks = (start, end) => {
+    if (start < 0 || end > blockchain.length || start > end) {
+        return [];
+    }
+    return blockchain.slice(start, end);
+};
+exports.getBlocks = getBlocks;
 const BLOCK_GENERATION_INTERVAL = 300;
 const DIFFICULTY_ADJUSTMENT_INTERVAL = 10;
 const getDifficulty = (aBlockchain) => {

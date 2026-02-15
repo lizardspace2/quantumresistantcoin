@@ -205,6 +205,13 @@ const getBlockHeaders = (start: number, end: number): Block[] => {
         }));
 };
 
+const getBlocks = (start: number, end: number): Block[] => {
+    if (start < 0 || end > blockchain.length || start > end) {
+        return [];
+    }
+    return blockchain.slice(start, end);
+};
+
 const BLOCK_GENERATION_INTERVAL: number = 300;
 
 const DIFFICULTY_ADJUSTMENT_INTERVAL: number = 10;
@@ -596,6 +603,7 @@ export {
     getCumulativeDifficulty,
     initGenesisBlock,
     getBlockHeaders, isValidBlockHeader,
+    getBlocks,
     getTotalSupply, getAllBalances,
     getSyncStatus
 };

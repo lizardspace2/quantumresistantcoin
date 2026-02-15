@@ -137,6 +137,20 @@ const initMessageHandler = (ws) => {
                 }
                 handleBinHeadersResponse(receivedHeaders, ws);
             }
+            else if (message.type === MessageType.QUERY_BLOCK_DATA) {
+                const { fromIndex, limit } = message.data || { fromIndex: 0, limit: 1 };
+                const blocks = (0, blockchain_1.getBlocks)(fromIndex, fromIndex + limit);
+                console.log(`Serving blocks ${fromIndex} to ${fromIndex + limit} (found: ${blocks.length})`);
+                write(ws, responseBlockDataMsg(blocks));
+            }
+            else if (message.type === MessageType.RESPONSE_BLOCK_DATA) {
+                const receivedBlocks = JSONToObject(message.data);
+                if (receivedBlocks === null) {
+                    console.log('invalid block data received');
+                    return;
+                }
+                handleBlockDataResponse(receivedBlocks, ws);
+            }
         }
         catch (e) {
             console.log(e);
@@ -157,12 +171,20 @@ const queryAllMsg = () => ({
     'type': MessageType.QUERY_ALL,
     'data': null
 });
+const queryBlockDataMsg = (fromIndex, limit) => ({
+    'type': MessageType.QUERY_BLOCK_DATA,
+    'data': { fromIndex, limit }
+});
 const responseChainMsg = () => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify((0, blockchain_1.getBlockchain)())
 });
 const responseLatestMsg = () => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN,
     'data': JSON.stringify([(0, blockchain_1.getLatestBlock)()])
+});
+const responseBlockDataMsg = (blocks) => ({
+    'type': MessageType.RESPONSE_BLOCK_DATA,
+    'data': JSON.stringify(blocks)
 });
 const queryTransactionPoolMsg = () => ({
     'type': MessageType.QUERY_TRANSACTION_POOL,
@@ -211,6 +233,59 @@ const punishPeer = (ws, penaltyType) => {
         ws.close();
     }
 };
+const handleBlockDataResponse = async (receivedBlocks, ws) => {
+    if (receivedBlocks.length === 0) {
+        console.log('received block data size of 0');
+        return;
+    }
+    console.log(`Received chunk of ${receivedBlocks.length} blocks. Processing...`);
+    // Sort just in case
+    receivedBlocks.sort((a, b) => a.index - b.index);
+    for (const block of receivedBlocks) {
+        const latestBlockHeld = (0, blockchain_1.getLatestBlock)();
+        if (block.index === latestBlockHeld.index + 1) {
+            if (latestBlockHeld.hash === block.previousHash) {
+                // Happy path: Append
+                try {
+                    await (0, blockchain_1.addBlockToChain)(block);
+                    // console.log(`Added block ${block.index}`);
+                }
+                catch (e) {
+                    console.log(`Error adding block ${block.index}: ${e.message}`);
+                    punishPeer(ws, 'BLOCK');
+                    return;
+                }
+            }
+            else {
+                console.log(`Block ${block.index} previous hash mismatch. Wanted ${latestBlockHeld.hash}, got ${block.previousHash}`);
+                // This implies a fork or bad chain. 
+                // If simple fork, we might need more complex recovery, but for sync, this usually means we are on wrong chain or they are.
+                return;
+            }
+        }
+        else if (block.index > latestBlockHeld.index + 1) {
+            console.log(`Received block ${block.index} but we are at ${latestBlockHeld.index}. Gap detected.`);
+            // Gap detected? Request from current + 1
+            // This happens if we receive a unordered chunk
+            break;
+        }
+        else {
+            // Already have it
+            // console.log(`Ignored block ${block.index} (already have ${latestBlockHeld.index})`);
+        }
+    }
+    // After processing chunk, check if we need more
+    const latestHeight = (0, blockchain_1.getLatestBlock)().index;
+    const peerHeight = peerHeights.get(ws) || 0;
+    if (latestHeight < peerHeight) {
+        console.log(`Sync continued: ${latestHeight} / ${peerHeight}. Requesting next chunk...`);
+        const nextChunkSize = 50;
+        write(ws, queryBlockDataMsg(latestHeight + 1, nextChunkSize));
+    }
+    else {
+        console.log('Sync finished or caught up with peer.');
+    }
+};
 const handleBlockchainResponse = async (receivedBlocks, ws) => {
     if (receivedBlocks.length === 0) {
         console.log('received block chain size of 0');
@@ -247,11 +322,16 @@ const handleBlockchainResponse = async (receivedBlocks, ws) => {
                 return;
             }
             console.log('We have to query the chain from our peer');
-            broadcast(queryHeadersMsg());
+            // broadcast(queryHeadersMsg()); 
+            // IMPROVEMENT: Direct query for blocks instead of generic headers broadcast?
+            // For now, keep standard discovery
+            write(ws, queryHeadersMsg());
         }
         else {
             console.log('Received blockchain is longer than current blockchain');
             try {
+                // If it's a full replace, be careful. 
+                // But typically handleBlockchainResponse is triggered by QUERY_ALL, which we want to avoid.
                 await (0, blockchain_1.replaceChain)(receivedBlocks);
             }
             catch (e) {
@@ -276,9 +356,12 @@ const handleBinHeadersResponse = async (receivedHeaders, ws) => {
     console.log('Received headers. Count: ' + receivedHeaders.length);
     const latestHeader = receivedHeaders[receivedHeaders.length - 1];
     const latestHeldBlock = (0, blockchain_1.getLatestBlock)();
+    // Update peer height knowledge
+    peerHeights.set(ws, latestHeader.index);
     if (latestHeader.index > latestHeldBlock.index) {
-        console.log('Peer has better chain (headers). Requesting full blocks.');
-        write(ws, queryAllMsg());
+        console.log(`Peer has better chain (height ${latestHeader.index}). Starting batch sync from ${latestHeldBlock.index + 1}`);
+        // Instead of QUERY_ALL, start chunk request
+        write(ws, queryBlockDataMsg(latestHeldBlock.index + 1, 50));
     }
 };
 const broadcastLatest = () => {
