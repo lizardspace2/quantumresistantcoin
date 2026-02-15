@@ -307,8 +307,8 @@ const initQuantum = async () => {
     }
 
     const bootNodes = [
-        'ws://35.225.236.73:6001',   // Genesis Node (ip-node-3)
-        'ws://34.68.204.103:6001'    // Explorer Node (node-explorer)
+        'ws://35.225.236.73:6001',   // Genesis Node
+        'ws://136.115.214.0:6001'    // New Explorer Node
     ];
     let peers = bootNodes;
 
