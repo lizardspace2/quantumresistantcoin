@@ -52,11 +52,21 @@ const initP2PServer = (p2pPort) => {
     // Active Resynchronization Loop
     // Explicitly ask peers for their latest block state every 10 seconds
     setInterval(() => {
-        if (sockets.length > 0) {
-            // console.log('Active Sync: checking for new blocks...');
-            broadcast(queryChainLengthMsg());
-        }
-    }, 10000);
+        const latestBlockHeld = (0, blockchain_1.getLatestBlock)();
+        const latestIndex = latestBlockHeld.index;
+        // Check if we are behind any peer
+        sockets.forEach(ws => {
+            const peerHeight = peerHeights.get(ws) || 0;
+            if (peerHeight > latestIndex) {
+                console.log(`Active Sync: Local height ${latestIndex} < Peer height ${peerHeight}. Requesting blocks...`);
+                write(ws, queryBlockDataMsg(latestIndex + 1, 50));
+            }
+            else {
+                // Or just ping to check if they have new stuff (optional, but good for liveness)
+                write(ws, queryChainLengthMsg());
+            }
+        });
+    }, 30000);
 };
 exports.initP2PServer = initP2PServer;
 const getSockets = () => sockets;
@@ -317,31 +327,17 @@ const handleBlockchainResponse = async (receivedBlocks, ws) => {
             }
         }
         else if (receivedBlocks.length === 1) {
-            if ((0, blockchain_1.getSyncStatus)()) {
-                console.log('Sync in progress. Ignoring repeated query triggers from peer.');
-                return;
-            }
             console.log('We have to query the chain from our peer');
-            // broadcast(queryHeadersMsg()); 
-            // IMPROVEMENT: Direct query for blocks instead of generic headers broadcast?
-            // For now, keep standard discovery
-            write(ws, queryHeadersMsg());
+            // If we received a single block that is ahead but doesn't link, we need to sync from our current height + 1
+            write(ws, queryBlockDataMsg(latestBlockHeld.index + 1, 50));
         }
         else {
             console.log('Received blockchain is longer than current blockchain');
-            try {
-                // If it's a full replace, be careful. 
-                // But typically handleBlockchainResponse is triggered by QUERY_ALL, which we want to avoid.
-                await (0, blockchain_1.replaceChain)(receivedBlocks);
-            }
-            catch (e) {
-                if (e instanceof validation_errors_1.ValidationError && e.shouldBan) {
-                    banPeer(ws, e.message);
-                    return;
-                }
-                punishPeer(ws, 'BLOCK');
-                console.log('Error replacing chain: ' + e.message);
-            }
+            // If we get here, it means we got a full chain response or a chunk that didn't match partial logic. 
+            // Trust our batch logic for sync. If the peer sends us a full chain, we might want to ignore it 
+            // if we are using batch sync, OR we can try to replace if valid (but replaceChain is heavy).
+            // Better to trigger batch sync.
+            write(ws, queryBlockDataMsg(latestBlockHeld.index + 1, 50));
         }
     }
     else {
