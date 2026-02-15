@@ -303,18 +303,21 @@ const connectToPeers = (newPeer: string): void => {
     knownPeers.add(newPeer);
 
     if (pendingPeers.has(newPeer)) {
+        console.log('Peer connect already pending: ' + newPeer);
         return;
     }
+    console.log('Attempting connection to peer: ' + newPeer);
     pendingPeers.add(newPeer);
 
     const ws: WebSocket = new WebSocket(newPeer);
     ws.on('open', () => {
+        console.log('Connect to peer success: ' + newPeer);
         pendingPeers.delete(newPeer);
         initConnection(ws);
         write(ws, queryHeadersMsg());
     });
-    ws.on('error', () => {
-        console.log('connection failed to ' + newPeer);
+    ws.on('error', (err) => {
+        console.log('Connection failed to ' + newPeer + ' Error: ' + err.message);
         pendingPeers.delete(newPeer);
     });
     ws.on('close', () => {
