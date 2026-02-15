@@ -3,7 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getSockets = exports.initP2PServer = exports.broadCastTransactionPool = exports.broadcastLatest = exports.connectToPeers = void 0;
+exports.getPeerInfo = exports.getSockets = exports.initP2PServer = exports.broadCastTransactionPool = exports.broadcastLatest = exports.connectToPeers = void 0;
 const ws_1 = __importDefault(require("ws"));
 const blockchain_1 = require("./blockchain");
 const transactionPool_1 = require("./transactionPool");
@@ -12,6 +12,7 @@ const peerManager_1 = require("./peerManager");
 const sockets = [];
 const knownPeers = new Set();
 const pendingPeers = new Set();
+const peerHeights = new Map();
 var MessageType;
 (function (MessageType) {
     MessageType[MessageType["QUERY_LATEST"] = 0] = "QUERY_LATEST";
@@ -142,6 +143,13 @@ const initMessageHandler = (ws) => {
         }
     });
 };
+const getPeerInfo = () => {
+    return sockets.map(s => ({
+        url: s.url || s._socket.remoteAddress + ':' + s._socket.remotePort,
+        height: peerHeights.get(s) || 0
+    }));
+};
+exports.getPeerInfo = getPeerInfo;
 const write = (ws, message) => ws.send(JSON.stringify(message));
 const broadcast = (message) => sockets.forEach((socket) => write(socket, message));
 const queryChainLengthMsg = () => ({ 'type': MessageType.QUERY_LATEST, 'data': null });
@@ -180,6 +188,11 @@ const initErrorHandler = (ws) => {
     ws.on('close', () => closeConnection(ws));
     ws.on('error', () => closeConnection(ws));
 };
+const closeConnection = (myWs) => {
+    console.log('connection failed to peer: ' + myWs.url);
+    sockets.splice(sockets.indexOf(myWs), 1);
+    peerHeights.delete(myWs);
+};
 const banPeer = (ws, reason) => {
     const ip = ws._socket.remoteAddress;
     console.log(`Banning peer ${ip} for: ${reason}`);
@@ -204,6 +217,7 @@ const handleBlockchainResponse = async (receivedBlocks, ws) => {
         return;
     }
     const latestBlockReceived = receivedBlocks[receivedBlocks.length - 1];
+    peerHeights.set(ws, latestBlockReceived.index);
     if (!(0, blockchain_1.isValidBlockStructure)(latestBlockReceived)) {
         console.log('block structuture not valid');
         return;
@@ -228,6 +242,10 @@ const handleBlockchainResponse = async (receivedBlocks, ws) => {
             }
         }
         else if (receivedBlocks.length === 1) {
+            if ((0, blockchain_1.getSyncStatus)()) {
+                console.log('Sync in progress. Ignoring repeated query triggers from peer.');
+                return;
+            }
             console.log('We have to query the chain from our peer');
             broadcast(queryHeadersMsg());
         }
@@ -274,17 +292,20 @@ const connectToPeers = (newPeer) => {
     }
     knownPeers.add(newPeer);
     if (pendingPeers.has(newPeer)) {
+        console.log('Peer connect already pending: ' + newPeer);
         return;
     }
+    console.log('Attempting connection to peer: ' + newPeer);
     pendingPeers.add(newPeer);
     const ws = new ws_1.default(newPeer);
     ws.on('open', () => {
+        console.log('Connect to peer success: ' + newPeer);
         pendingPeers.delete(newPeer);
         initConnection(ws);
         write(ws, queryHeadersMsg());
     });
-    ws.on('error', () => {
-        console.log('connection failed to ' + newPeer);
+    ws.on('error', (err) => {
+        console.log('Connection failed to ' + newPeer + ' Error: ' + err.message);
         pendingPeers.delete(newPeer);
     });
     ws.on('close', () => {

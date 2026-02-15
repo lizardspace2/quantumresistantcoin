@@ -257,6 +257,16 @@ const initHttpServer = (myHttpPort) => {
         res.send({ 'msg': 'stopping server' });
         process.exit();
     });
+    app.get('/debug', (req, res) => {
+        res.send({
+            height: (0, blockchain_1.getLatestBlock)().index,
+            isSyncing: (0, blockchain_1.getSyncStatus)(),
+            peers: (0, p2p_1.getPeerInfo)().map(p => ({
+                url: p.url,
+                height: p.height
+            }))
+        });
+    });
     app.listen(myHttpPort, () => {
         console.log('Listening http on port: ' + myHttpPort);
         if (safeMode) {
@@ -286,10 +296,12 @@ const initQuantum = async () => {
     (0, wallet_1.initWallet)();
     initHttpServer(httpPort);
     (0, p2p_1.initP2PServer)(p2pPort);
-    initAutoMining();
+    if (process.env.ENABLE_MINING === 'true') {
+        initAutoMining();
+    }
     const bootNodes = [
-        'ws://35.225.236.73:6001',
-        'ws://34.68.204.103:6001' // Explorer Node (node-explorer)
+        'ws://35.225.236.73:6001' // Genesis Node
+        // 'ws://136.115.214.0:6001'   // REMOVED: Do not add self-address here, it causes loops!
     ];
     let peers = bootNodes;
     if (process.env.PEERS) {
