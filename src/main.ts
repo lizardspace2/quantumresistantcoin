@@ -22,7 +22,7 @@ import _ from 'lodash';
 import {
     Block, generateNextBlock, generatenextBlockWithTransaction, generateRawNextBlock, getAccountBalance,
     getBlockchain, getBlockHeaders, getMyUnspentTransactionOutputs, getUnspentTxOuts, sendTransaction, initGenesisBlock,
-    getTotalSupply, getAllBalances, handleReceivedTransaction, getLatestBlock
+    getTotalSupply, getAllBalances, handleReceivedTransaction, getLatestBlock, getSyncStatus
 } from './blockchain';
 import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool, getPeerInfo } from './p2p';
 import { UnspentTxOut } from './transaction';
@@ -263,7 +263,7 @@ const initHttpServer = (myHttpPort: number) => {
     app.get('/debug', (req, res) => {
         res.send({
             height: getLatestBlock().index,
-            isSyncing: false, // TODO: Expose isSyncing from blockchain.ts
+            isSyncing: getSyncStatus(),
             peers: getPeerInfo().map(p => ({
                 url: p.url,
                 height: p.height
@@ -307,8 +307,8 @@ const initQuantum = async () => {
     }
 
     const bootNodes = [
-        'ws://35.225.236.73:6001',   // Genesis Node
-        'ws://136.115.214.0:6001'    // New Explorer Node
+        'ws://35.225.236.73:6001'   // Genesis Node
+        // 'ws://136.115.214.0:6001'   // REMOVED: Do not add self-address here, it causes loops!
     ];
     let peers = bootNodes;
 

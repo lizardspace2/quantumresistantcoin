@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import { Server } from 'ws';
 import {
     addBlockToChain, Block, getBlockchain, getLatestBlock, handleReceivedTransaction, isValidBlockStructure,
-    replaceChain, getBlockHeaders, isValidBlockHeader
+    replaceChain, getBlockHeaders, isValidBlockHeader, getSyncStatus
 } from './blockchain';
 import { Transaction } from './transaction';
 import { getTransactionPool } from './transactionPool';
@@ -254,6 +254,10 @@ const handleBlockchainResponse = async (receivedBlocks: Block[], ws: WebSocket) 
                 console.log('Error adding block: ' + e.message);
             }
         } else if (receivedBlocks.length === 1) {
+            if (getSyncStatus()) {
+                console.log('Sync in progress. Ignoring repeated query triggers from peer.');
+                return;
+            }
             console.log('We have to query the chain from our peer');
             broadcast(queryHeadersMsg());
         } else {

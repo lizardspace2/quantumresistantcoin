@@ -443,7 +443,7 @@ const isValidChain = async (blockchainToValidate: Block[]): Promise<UnspentTxOut
     let aUnspentTxOuts: UnspentTxOut[] = [];
 
     for (let i = 0; i < blockchainToValidate.length; i++) {
-        if (i % 100 === 0) {
+        if (i % 10 === 0) {
             console.log(`Validating block ${i}/${blockchainToValidate.length}`);
             await yieldToEventLoop();
         }
@@ -535,6 +535,8 @@ const replaceChain = async (newBlocks: Block[]) => {
     }
 };
 
+const getSyncStatus = () => isSyncing;
+
 const handleReceivedTransaction = (transaction: Transaction) => {
     addToTransactionPool(transaction, getUnspentTxOuts());
 };
@@ -567,5 +569,6 @@ export {
     getCumulativeDifficulty,
     initGenesisBlock,
     getBlockHeaders, isValidBlockHeader,
-    getTotalSupply, getAllBalances
+    getTotalSupply, getAllBalances,
+    getSyncStatus
 };
