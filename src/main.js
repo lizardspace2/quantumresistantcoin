@@ -279,15 +279,24 @@ const initAutoMining = () => {
     console.log(`Starting auto-mining with ${interval}ms interval`);
     setInterval(async () => {
         try {
-            if ((0, blockchain_1.getAccountBalance)() > 0) {
+            const balance = (0, blockchain_1.getAccountBalance)();
+            if (balance > 0) {
+                // console.log(`Auto-mining: Balance ${balance}. Generating block...`);
                 const newBlock = await (0, blockchain_1.generateNextBlock)();
                 if (newBlock) {
                     console.log(`Auto-generation: Mined block ${newBlock.index}`);
                 }
+                else {
+                    // console.log('Auto-generation: No block found (difficulty too high?)');
+                }
+            }
+            else {
+                // console.log('Auto-mining skipped: Zero balance');
             }
         }
         catch (e) {
-            console.log('Auto-mining error:', e.message);
+            console.log('Auto-mining error details:', e);
+            console.log('Auto-mining error message:', e.message);
         }
     }, interval);
 };

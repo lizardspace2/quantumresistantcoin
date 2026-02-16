@@ -205,6 +205,7 @@ const getDifficulty = (aBlockchain) => {
     // Emergency Reset: If chain is stuck for > 1 hour, reset difficulty to 1 to allow recovery
     const currentTime = Math.round(new Date().getTime() / 1000);
     const timeSinceLastBlock = currentTime - latestBlock.timestamp;
+    // console.log(`Difficulty Check: Last Block Time ${latestBlock.timestamp}, Current ${currentTime}, Diff ${timeSinceLastBlock}s`);
     if (timeSinceLastBlock > 3600) {
         console.log(`EMERGENCY: Chain stuck for ${timeSinceLastBlock}s. Resetting difficulty to 1.`);
         return 1;
@@ -286,6 +287,9 @@ const findBlock = (index, previousHash, data, difficulty) => {
     const timestamp = getCurrentTimestamp();
     const merkleRoot = (0, merkle_1.getMerkleRoot)(data);
     const hash = calculateHash(index, previousHash, timestamp, merkleRoot, difficulty, getAccountBalance(), (0, wallet_1.getPublicFromWallet)());
+    if (difficulty === 1) {
+        console.log(`Mining attempt at Difficulty 1 (Emergency Mode). Index: ${index}`);
+    }
     if (isBlockStakingValid(previousHash, (0, wallet_1.getPublicFromWallet)(), timestamp, getAccountBalance(), difficulty, index)) {
         const currentUTXOs = getUnspentTxOuts();
         const nextUTXOs = (0, transaction_1.processTransactions)(data, currentUTXOs, index);
