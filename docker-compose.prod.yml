@@ -12,6 +12,7 @@ services:
       - P2P_PORT=6001
       - PEERS=
       - PRIVATE_KEY=node/wallet/private_key
+      - ENABLE_MINING=true
     deploy:
       resources:
         limits:
