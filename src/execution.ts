@@ -2,7 +2,7 @@ import { Block } from './blockchain';
 import { State } from './state';
 import { Transaction, UnspentTxOut, processTransactions, getCoinbaseTransaction, validateTransaction, getTxFee, validateBlockTransactions } from './transaction';
 import { ValidationError, ValidationErrorCode } from './validation_errors';
-import * as _ from 'lodash';
+// import * as _ from 'lodash';
 
 export class BlockExecutor {
 

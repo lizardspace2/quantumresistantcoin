@@ -17,7 +17,7 @@
  * Based on work by Sandoche Adittane and Lauri Hartikka.
  */
 import * as CryptoJS from 'crypto-js';
-import * as _ from 'lodash';
+// import * as _ from 'lodash';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { broadcastLatest, broadCastTransactionPool } from './p2p';
 import { getMerkleRoot } from './merkle';
@@ -187,7 +187,7 @@ const saveBlockchain = () => {
 
 const getBlockchain = (): Block[] => blockchain;
 
-const getUnspentTxOuts = (): UnspentTxOut[] => _.cloneDeep(unspentTxOuts);
+const getUnspentTxOuts = (): UnspentTxOut[] => unspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
 
 const setUnspentTxOuts = (newUnspentTxOut: UnspentTxOut[]) => {
     unspentTxOuts = newUnspentTxOut;

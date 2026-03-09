@@ -17,7 +17,7 @@
  * Based on work by Sandoche Adittane and Lauri Hartikka.
  */
 import * as CryptoJS from 'crypto-js';
-import _ from 'lodash';
+// import _ from 'lodash';
 import { getDilithiumSync, DILITHIUM_LEVEL, getPublicKey } from './wallet';
 import { ValidationError, ValidationErrorCode } from './validation_errors';
 
@@ -159,10 +159,9 @@ const validateBlockTransactions = (aTransactions: Transaction[], aUnspentTxOuts:
         throw new ValidationError('invalid coinbase transaction: ' + JSON.stringify(coinbaseTx), ValidationErrorCode.INVALID_COINBASE, true);
     }
 
-    const txIns: TxIn[] = _(aTransactions)
+    const txIns: TxIn[] = aTransactions
         .map((tx) => tx.txIns)
-        .flatten()
-        .value();
+        .flat();
 
     if (hasDuplicates(txIns)) {
         throw new ValidationError('duplicate txIns found in block transactions', ValidationErrorCode.DUPLICATE_TX, true);
@@ -177,17 +176,20 @@ const validateBlockTransactions = (aTransactions: Transaction[], aUnspentTxOuts:
 };
 
 const hasDuplicates = (txIns: TxIn[]): boolean => {
-    const groups = _.countBy(txIns, (txIn: TxIn) => txIn.txOutId + txIn.txOutIndex);
-    return _(groups)
-        .map((value, key) => {
-            if (value > 1) {
+    const keys = txIns.map((txIn: TxIn) => txIn.txOutId + txIn.txOutIndex);
+    const uniqueKeys = new Set(keys);
+    if (uniqueKeys.size !== keys.length) {
+        // Find which ones are duplicates for logging
+        const seen = new Set();
+        for (const key of keys) {
+            if (seen.has(key)) {
                 console.log('duplicate txIn: ' + key);
-                return true;
-            } else {
-                return false;
             }
-        })
-        .includes(true);
+            seen.add(key);
+        }
+        return true;
+    }
+    return false;
 };
 
 const validateCoinbaseTx = (transaction: Transaction, blockIndex: number): boolean => {
@@ -307,7 +309,7 @@ const signTxIn = (transaction: Transaction, txInIndex: number,
         const messageUint8 = new Uint8Array(messageBuffer);
 
         const signature = dilithium.sign(messageUint8, privKeyBuffer, DILITHIUM_LEVEL);
-        return Buffer.from(signature).toString('hex');
+        return Buffer.from(signature as any).toString('hex');
     } catch (error) {
         console.log('error signing transaction: ' + error.message);
         throw error;

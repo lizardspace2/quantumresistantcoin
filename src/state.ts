@@ -4,14 +4,18 @@ import * as CryptoJS from 'crypto-js';
 
 const calculateStateRoot = (unspentTxOuts: UnspentTxOut[]): string => {
     // Sort by txOutId then txOutIndex to ensure consistent hash
+    // Standard lexicographical sort for multiple fields
     const sortedUTXOs = [...unspentTxOuts].sort((a, b) => {
         if (a.txOutId < b.txOutId) return -1;
         if (a.txOutId > b.txOutId) return 1;
-        return a.txOutIndex - b.txOutIndex;
+        if (a.txOutIndex < b.txOutIndex) return -1;
+        if (a.txOutIndex > b.txOutIndex) return 1;
+        return 0;
     });
 
-    // Using toFixed(8) for the amount to ensure decimal consistency across platforms
-    const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount.toFixed(8));
+    // We must match the network's string representation exactly.
+    // The original code used `+ u.amount` which uses default .toString()
+    const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount);
 
     if (utxoStrings.length === 0) {
         return CryptoJS.SHA256("").toString();
