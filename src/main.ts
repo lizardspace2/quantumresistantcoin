@@ -29,11 +29,11 @@ import { UnspentTxOut } from './transaction';
 import { getTransactionPool } from './transactionPool';
 import { getPublicFromWallet, initWallet, getPrivateFromWallet } from './wallet';
 
-const httpPort: number = parseInt(process.env.HTTP_PORT) || 3001;
-const p2pPort: number = parseInt(process.env.P2P_PORT) || 6001;
+const httpPort: number = parseInt(process.env.HTTP_PORT || '3001');
+const p2pPort: number = parseInt(process.env.P2P_PORT || '6001');
 const safeMode: boolean = process.env.SAFE_MODE === 'true';
 
-const checkSafeMode = (req, res, next) => {
+const checkSafeMode = (req: express.Request, res: express.Response, next: express.NextFunction) => {
     if (safeMode) {
         res.status(403).send('Endpoint disabled in safe mode');
         return;
@@ -46,7 +46,7 @@ const initHttpServer = (myHttpPort: number) => {
     app.set('etag', false);
     app.use(bodyParser.json());
 
-    app.use((err, req, res, next) => {
+    app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
         if (err) {
             res.status(400).send(err.message);
         }
@@ -75,7 +75,7 @@ const initHttpServer = (myHttpPort: number) => {
 
     app.get('/transaction/:id', (req, res) => {
         const tx = _(getBlockchain())
-            .map((blocks) => blocks.data)
+            .map((block: Block) => block.data)
             .flatten()
             .find({ 'id': req.params.id });
         res.send(tx);
@@ -148,7 +148,7 @@ const initHttpServer = (myHttpPort: number) => {
             res.send('data parameter is missing');
             return;
         }
-        const newBlock: Block = await generateRawNextBlock(req.body.data);
+        const newBlock: Block | null = await generateRawNextBlock(req.body.data);
         if (newBlock === null) {
             res.status(400).send('could not generate block');
         } else {
@@ -157,7 +157,7 @@ const initHttpServer = (myHttpPort: number) => {
     });
 
     app.post('/mintBlock', checkSafeMode, async (req, res) => {
-        const newBlock: Block = await generateNextBlock();
+        const newBlock: Block | null = await generateNextBlock();
         if (newBlock === null) {
             res.status(400).send('could not generate block');
         } else {
@@ -195,7 +195,7 @@ const initHttpServer = (myHttpPort: number) => {
             }
             const resp = await generatenextBlockWithTransaction(address, amount);
             res.send(resp);
-        } catch (e) {
+        } catch (e: any) {
             console.log('mintTransaction error: ' + e.message);
             res.status(400).send(e.message);
         }
@@ -217,7 +217,7 @@ const initHttpServer = (myHttpPort: number) => {
             }
             const resp = sendTransaction(address, amount);
             res.send(resp);
-        } catch (e) {
+        } catch (e: any) {
             console.log('sendTransaction error: ' + e.message);
             res.status(400).send(e.message);
         }
@@ -233,7 +233,7 @@ const initHttpServer = (myHttpPort: number) => {
             handleReceivedTransaction(tx);
             broadCastTransactionPool();
             res.send('transaction added to pool');
-        } catch (e) {
+        } catch (e: any) {
             console.log('transactionPool error: ' + e.message);
             res.status(400).send(e.message);
         }
@@ -297,7 +297,7 @@ const initAutoMining = () => {
             } else {
                 // console.log('Auto-mining skipped: Zero balance');
             }
-        } catch (e) {
+        } catch (e: any) {
             console.log('Auto-mining error details:', e);
             console.log('Auto-mining error message:', e.message);
         }
