@@ -175,7 +175,11 @@ const getPeerInfo = () => {
     }));
 };
 
-const write = (ws: WebSocket, message: Message): void => ws.send(JSON.stringify(message));
+const write = (ws: WebSocket, message: Message): void => {
+    if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+    }
+};
 const broadcast = (message: Message): void => sockets.forEach((socket) => write(socket, message));
 
 const queryChainLengthMsg = (): Message => ({ 'type': MessageType.QUERY_LATEST, 'data': null });

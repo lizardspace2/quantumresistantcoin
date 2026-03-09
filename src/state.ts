@@ -1,10 +1,17 @@
-import * as _ from 'lodash';
+// import * as _ from 'lodash';
 import { UnspentTxOut, Transaction, TxIn, TxOut } from './transaction';
 import * as CryptoJS from 'crypto-js';
 
 const calculateStateRoot = (unspentTxOuts: UnspentTxOut[]): string => {
-    const sortedUTXOs = _.sortBy(unspentTxOuts, ['txOutId', 'txOutIndex']);
-    const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount);
+    // Sort by txOutId then txOutIndex to ensure consistent hash
+    const sortedUTXOs = [...unspentTxOuts].sort((a, b) => {
+        if (a.txOutId < b.txOutId) return -1;
+        if (a.txOutId > b.txOutId) return 1;
+        return a.txOutIndex - b.txOutIndex;
+    });
+
+    // Using toFixed(8) for the amount to ensure decimal consistency across platforms
+    const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount.toFixed(8));
 
     if (utxoStrings.length === 0) {
         return CryptoJS.SHA256("").toString();
