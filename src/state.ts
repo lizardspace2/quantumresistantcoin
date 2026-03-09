@@ -24,11 +24,11 @@ export class State {
     private unspentTxOuts: UnspentTxOut[];
 
     constructor(initialUnspentTxOuts: UnspentTxOut[] = []) {
-        this.unspentTxOuts = _.cloneDeep(initialUnspentTxOuts);
+        this.unspentTxOuts = initialUnspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
     }
 
     public getUnspentTxOuts(): UnspentTxOut[] {
-        return _.cloneDeep(this.unspentTxOuts);
+        return this.unspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
     }
 
     public setUnspentTxOuts(newUnspentTxOuts: UnspentTxOut[]) {
