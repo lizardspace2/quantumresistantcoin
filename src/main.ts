@@ -18,7 +18,7 @@
  */
 import * as  bodyParser from 'body-parser';
 import express from 'express';
-import _ from 'lodash';
+// import _ from 'lodash'; // Removed to avoid typing issues
 import {
     Block, generateNextBlock, generatenextBlockWithTransaction, generateRawNextBlock, getAccountBalance,
     getBlockchain, getBlockHeaders, getMyUnspentTransactionOutputs, getUnspentTxOuts, sendTransaction, initGenesisBlock,
@@ -56,13 +56,13 @@ const initHttpServer = (myHttpPort: number) => {
         res.send(getBlockchain());
     });
 
-    app.get('/block/:hash', (req, res) => {
-        const block = _.find(getBlockchain(), { 'hash': req.params.hash });
+    app.get('/block/:hash', (req: express.Request, res: express.Response) => {
+        const block = getBlockchain().find((b: Block) => b.hash === req.params.hash);
         res.send(block);
     });
 
-    app.get('/block/index/:index', (req, res) => {
-        const block = _.find(getBlockchain(), { 'index': parseInt(req.params.index) });
+    app.get('/block/index/:index', (req: express.Request, res: express.Response) => {
+        const block = getBlockchain().find((b: Block) => b.index === parseInt(req.params.index));
         res.send(block);
     });
 
@@ -73,11 +73,11 @@ const initHttpServer = (myHttpPort: number) => {
         res.send(blocks);
     });
 
-    app.get('/transaction/:id', (req, res) => {
-        const tx = _(getBlockchain())
+    app.get('/transaction/:id', (req: express.Request, res: express.Response) => {
+        const tx = getBlockchain()
             .map((block: Block) => block.data)
-            .flatten()
-            .find({ 'id': req.params.id });
+            .flat()
+            .find((t: any) => t.id === req.params.id);
         res.send(tx);
     });
 
@@ -121,9 +121,9 @@ const initHttpServer = (myHttpPort: number) => {
         });
     });
 
-    app.get('/address/:address', (req, res) => {
+    app.get('/address/:address', (req: express.Request, res: express.Response) => {
         const unspentTxOuts: UnspentTxOut[] =
-            _.filter(getUnspentTxOuts(), (uTxO) => uTxO.address === req.params.address);
+            getUnspentTxOuts().filter((uTxO: UnspentTxOut) => uTxO.address === req.params.address);
         res.send({ 'unspentTxOuts': unspentTxOuts });
     });
 
