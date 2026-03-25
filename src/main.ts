@@ -286,7 +286,8 @@ const initAutoMining = () => {
     setInterval(async () => {
         try {
             const balance = getAccountBalance();
-            if (balance > 0) {
+            const latestBlock = getLatestBlock();
+            if (balance > 0 || latestBlock.index <= 1000000) {
                 // console.log(`Auto-mining: Balance ${balance}. Generating block...`);
                 const newBlock = await generateNextBlock();
                 if (newBlock) {

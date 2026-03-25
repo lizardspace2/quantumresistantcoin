@@ -425,7 +425,7 @@ const hasValidHash = (block: Block): boolean => {
         return false;
     }
 
-    if (!isBlockStakingValid(block.previousHash, block.minterAddress, block.minterBalance, block.timestamp, block.difficulty, block.index)) {
+    if (!isBlockStakingValid(block.previousHash, block.minterAddress, block.timestamp, block.minterBalance, block.difficulty, block.index)) {
         console.log('staking hash not lower than balance over diffculty times 2^256');
         return false;
     }
