@@ -174,7 +174,11 @@ const getPeerInfo = () => {
     }));
 };
 exports.getPeerInfo = getPeerInfo;
-const write = (ws, message) => ws.send(JSON.stringify(message));
+const write = (ws, message) => {
+    if (ws.readyState === ws_1.default.OPEN) {
+        ws.send(JSON.stringify(message));
+    }
+};
 const broadcast = (message) => sockets.forEach((socket) => write(socket, message));
 const queryChainLengthMsg = () => ({ 'type': MessageType.QUERY_LATEST, 'data': null });
 const queryAllMsg = () => ({
@@ -185,9 +189,22 @@ const queryBlockDataMsg = (fromIndex, limit) => ({
     'type': MessageType.QUERY_BLOCK_DATA,
     'data': { fromIndex, limit }
 });
-const responseChainMsg = () => ({
-    'type': MessageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify((0, blockchain_1.getBlockchain)())
-});
+const responseChainMsg = () => {
+    const blockchain = (0, blockchain_1.getBlockchain)();
+    // Low RAM: If the blockchain is too long, don't send the full thing at once
+    // Peer should use chunked sync (QUERY_BLOCK_DATA) instead.
+    if (blockchain.length > 50) {
+        console.log(`P2P: Chain too long (${blockchain.length}). Sending only latest 50 blocks.`);
+        return {
+            'type': MessageType.RESPONSE_BLOCKCHAIN,
+            'data': JSON.stringify(blockchain.slice(blockchain.length - 50))
+        };
+    }
+    return {
+        'type': MessageType.RESPONSE_BLOCKCHAIN,
+        'data': JSON.stringify(blockchain)
+    };
+};
 const responseLatestMsg = () => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN,
     'data': JSON.stringify([(0, blockchain_1.getLatestBlock)()])
@@ -294,6 +311,7 @@ const handleBlockDataResponse = async (receivedBlocks, ws) => {
     }
     else {
         console.log('Sync finished or caught up with peer.');
+        await (0, blockchain_1.saveBlockchain)(true);
     }
 };
 const handleBlockchainResponse = async (receivedBlocks, ws) => {

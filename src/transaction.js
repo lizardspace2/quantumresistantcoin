@@ -22,9 +22,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
     __setModuleDefault(result, mod);
     return result;
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validateBlockTransactions = exports.hasDuplicates = exports.getPublicKey = exports.validateTransaction = exports.isValidAddress = exports.getTransactionId = exports.signTxIn = exports.processTransactions = exports.Transaction = exports.TxOut = exports.TxIn = exports.UnspentTxOut = exports.getTxFee = exports.getCoinbaseTransaction = exports.getCoinbaseAmount = void 0;
 /*
@@ -46,7 +43,7 @@ exports.validateBlockTransactions = exports.hasDuplicates = exports.getPublicKey
  * Based on work by Sandoche Adittane and Lauri Hartikka.
  */
 const CryptoJS = __importStar(require("crypto-js"));
-const lodash_1 = __importDefault(require("lodash"));
+// import _ from 'lodash';
 const wallet_1 = require("./wallet");
 Object.defineProperty(exports, "getPublicKey", { enumerable: true, get: function () { return wallet_1.getPublicKey; } });
 const validation_errors_1 = require("./validation_errors");
@@ -154,10 +151,9 @@ const validateBlockTransactions = (aTransactions, aUnspentTxOuts, blockIndex) =>
     if (!validateCoinbaseTx(coinbaseTx, blockIndex)) {
         throw new validation_errors_1.ValidationError('invalid coinbase transaction: ' + JSON.stringify(coinbaseTx), validation_errors_1.ValidationErrorCode.INVALID_COINBASE, true);
     }
-    const txIns = (0, lodash_1.default)(aTransactions)
+    const txIns = aTransactions
         .map((tx) => tx.txIns)
-        .flatten()
-        .value();
+        .flat();
     if (hasDuplicates(txIns)) {
         throw new validation_errors_1.ValidationError('duplicate txIns found in block transactions', validation_errors_1.ValidationErrorCode.DUPLICATE_TX, true);
     }
@@ -169,18 +165,20 @@ const validateBlockTransactions = (aTransactions, aUnspentTxOuts, blockIndex) =>
 };
 exports.validateBlockTransactions = validateBlockTransactions;
 const hasDuplicates = (txIns) => {
-    const groups = lodash_1.default.countBy(txIns, (txIn) => txIn.txOutId + txIn.txOutIndex);
-    return (0, lodash_1.default)(groups)
-        .map((value, key) => {
-        if (value > 1) {
-            console.log('duplicate txIn: ' + key);
-            return true;
+    const keys = txIns.map((txIn) => txIn.txOutId + txIn.txOutIndex);
+    const uniqueKeys = new Set(keys);
+    if (uniqueKeys.size !== keys.length) {
+        // Find which ones are duplicates for logging
+        const seen = new Set();
+        for (const key of keys) {
+            if (seen.has(key)) {
+                console.log('duplicate txIn: ' + key);
+            }
+            seen.add(key);
         }
-        else {
-            return false;
-        }
-    })
-        .includes(true);
+        return true;
+    }
+    return false;
 };
 exports.hasDuplicates = hasDuplicates;
 const validateCoinbaseTx = (transaction, blockIndex) => {

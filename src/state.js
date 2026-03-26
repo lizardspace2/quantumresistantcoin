@@ -24,10 +24,25 @@ var __importStar = (this && this.__importStar) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.State = void 0;
-const _ = __importStar(require("lodash"));
+// import * as _ from 'lodash';
+const transaction_1 = require("./transaction");
 const CryptoJS = __importStar(require("crypto-js"));
 const calculateStateRoot = (unspentTxOuts) => {
-    const sortedUTXOs = _.sortBy(unspentTxOuts, ['txOutId', 'txOutIndex']);
+    // Sort by txOutId then txOutIndex to ensure consistent hash
+    // Standard lexicographical sort for multiple fields
+    const sortedUTXOs = [...unspentTxOuts].sort((a, b) => {
+        if (a.txOutId < b.txOutId)
+            return -1;
+        if (a.txOutId > b.txOutId)
+            return 1;
+        if (a.txOutIndex < b.txOutIndex)
+            return -1;
+        if (a.txOutIndex > b.txOutIndex)
+            return 1;
+        return 0;
+    });
+    // We must match the network's string representation exactly.
+    // The original code used `+ u.amount` which uses default .toString()
     const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount);
     if (utxoStrings.length === 0) {
         return CryptoJS.SHA256("").toString();
@@ -36,10 +51,10 @@ const calculateStateRoot = (unspentTxOuts) => {
 };
 class State {
     constructor(initialUnspentTxOuts = []) {
-        this.unspentTxOuts = _.cloneDeep(initialUnspentTxOuts);
+        this.unspentTxOuts = initialUnspentTxOuts.map(u => new transaction_1.UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
     }
     getUnspentTxOuts() {
-        return _.cloneDeep(this.unspentTxOuts);
+        return this.unspentTxOuts.map(u => new transaction_1.UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
     }
     setUnspentTxOuts(newUnspentTxOuts) {
         this.unspentTxOuts = newUnspentTxOuts;

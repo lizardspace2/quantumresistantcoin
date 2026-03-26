@@ -4,6 +4,7 @@ exports.BlockExecutor = void 0;
 const state_1 = require("./state");
 const transaction_1 = require("./transaction");
 const validation_errors_1 = require("./validation_errors");
+// import * as _ from 'lodash';
 class BlockExecutor {
     static async executeBlock(block, currentState) {
         const currentUTXOs = currentState.getUnspentTxOuts();

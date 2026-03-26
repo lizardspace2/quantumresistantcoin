@@ -53,7 +53,17 @@ const initHttpServer = (myHttpPort: number) => {
     });
 
     app.get('/blocks', (req, res) => {
-        res.send(getBlockchain());
+        const blockchain = getBlockchain();
+        res.setHeader('Content-Type', 'application/json');
+        res.write('[');
+        for (let i = 0; i < blockchain.length; i++) {
+            res.write(JSON.stringify(blockchain[i]));
+            if (i < blockchain.length - 1) {
+                res.write(',');
+            }
+        }
+        res.write(']');
+        res.end();
     });
 
     app.get('/block/:hash', (req: express.Request, res: express.Response) => {
@@ -306,7 +316,7 @@ const initAutoMining = () => {
 };
 
 const initQuantum = async () => {
-    initGenesisBlock();
+    await initGenesisBlock();
     initWallet();
     initHttpServer(httpPort);
     initP2PServer(p2pPort);

@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import { Server } from 'ws';
 import {
     addBlockToChain, Block, getBlockchain, getLatestBlock, handleReceivedTransaction, isValidBlockStructure,
-    replaceChain, getBlockHeaders, isValidBlockHeader, getSyncStatus, getBlocks
+    replaceChain, getBlockHeaders, isValidBlockHeader, getSyncStatus, getBlocks, saveBlockchain
 } from './blockchain';
 import { Transaction } from './transaction';
 import { getTransactionPool } from './transactionPool';
@@ -194,9 +194,22 @@ const queryBlockDataMsg = (fromIndex: number, limit: number): Message => ({
     'data': { fromIndex, limit }
 });
 
-const responseChainMsg = (): Message => ({
-    'type': MessageType.RESPONSE_BLOCKCHAIN, 'data': JSON.stringify(getBlockchain())
-});
+const responseChainMsg = (): Message => {
+    const blockchain = getBlockchain();
+    // Low RAM: If the blockchain is too long, don't send the full thing at once
+    // Peer should use chunked sync (QUERY_BLOCK_DATA) instead.
+    if (blockchain.length > 50) {
+        console.log(`P2P: Chain too long (${blockchain.length}). Sending only latest 50 blocks.`);
+        return {
+            'type': MessageType.RESPONSE_BLOCKCHAIN,
+            'data': JSON.stringify(blockchain.slice(blockchain.length - 50))
+        };
+    }
+    return {
+        'type': MessageType.RESPONSE_BLOCKCHAIN, 
+        'data': JSON.stringify(blockchain)
+    };
+};
 
 const responseLatestMsg = (): Message => ({
     'type': MessageType.RESPONSE_BLOCKCHAIN,
@@ -311,6 +324,7 @@ const handleBlockDataResponse = async (receivedBlocks: Block[], ws: WebSocket) =
         write(ws, queryBlockDataMsg(latestHeight + 1, nextChunkSize));
     } else {
         console.log('Sync finished or caught up with peer.');
+        await saveBlockchain(true);
     }
 };
 

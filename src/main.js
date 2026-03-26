@@ -46,13 +46,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 const bodyParser = __importStar(require("body-parser"));
 const express_1 = __importDefault(require("express"));
-const lodash_1 = __importDefault(require("lodash"));
+// import _ from 'lodash'; // Removed to avoid typing issues
 const blockchain_1 = require("./blockchain");
 const p2p_1 = require("./p2p");
 const transactionPool_1 = require("./transactionPool");
 const wallet_1 = require("./wallet");
-const httpPort = parseInt(process.env.HTTP_PORT) || 3001;
-const p2pPort = parseInt(process.env.P2P_PORT) || 6001;
+const httpPort = parseInt(process.env.HTTP_PORT || '3001');
+const p2pPort = parseInt(process.env.P2P_PORT || '6001');
 const safeMode = process.env.SAFE_MODE === 'true';
 const checkSafeMode = (req, res, next) => {
     if (safeMode) {
@@ -71,14 +71,24 @@ const initHttpServer = (myHttpPort) => {
         }
     });
     app.get('/blocks', (req, res) => {
-        res.send((0, blockchain_1.getBlockchain)());
+        const blockchain = (0, blockchain_1.getBlockchain)();
+        res.setHeader('Content-Type', 'application/json');
+        res.write('[');
+        for (let i = 0; i < blockchain.length; i++) {
+            res.write(JSON.stringify(blockchain[i]));
+            if (i < blockchain.length - 1) {
+                res.write(',');
+            }
+        }
+        res.write(']');
+        res.end();
     });
     app.get('/block/:hash', (req, res) => {
-        const block = lodash_1.default.find((0, blockchain_1.getBlockchain)(), { 'hash': req.params.hash });
+        const block = (0, blockchain_1.getBlockchain)().find((b) => b.hash === req.params.hash);
         res.send(block);
     });
     app.get('/block/index/:index', (req, res) => {
-        const block = lodash_1.default.find((0, blockchain_1.getBlockchain)(), { 'index': parseInt(req.params.index) });
+        const block = (0, blockchain_1.getBlockchain)().find((b) => b.index === parseInt(req.params.index));
         res.send(block);
     });
     app.get('/blocks/:from/:to', (req, res) => {
@@ -88,10 +98,10 @@ const initHttpServer = (myHttpPort) => {
         res.send(blocks);
     });
     app.get('/transaction/:id', (req, res) => {
-        const tx = (0, lodash_1.default)((0, blockchain_1.getBlockchain)())
-            .map((blocks) => blocks.data)
-            .flatten()
-            .find({ 'id': req.params.id });
+        const tx = (0, blockchain_1.getBlockchain)()
+            .map((block) => block.data)
+            .flat()
+            .find((t) => t.id === req.params.id);
         res.send(tx);
     });
     app.get('/transaction-status/:id', (req, res) => {
@@ -132,7 +142,7 @@ const initHttpServer = (myHttpPort) => {
         });
     });
     app.get('/address/:address', (req, res) => {
-        const unspentTxOuts = lodash_1.default.filter((0, blockchain_1.getUnspentTxOuts)(), (uTxO) => uTxO.address === req.params.address);
+        const unspentTxOuts = (0, blockchain_1.getUnspentTxOuts)().filter((uTxO) => uTxO.address === req.params.address);
         res.send({ 'unspentTxOuts': unspentTxOuts });
     });
     app.get('/unspentTransactionOutputs', (req, res) => {
@@ -280,7 +290,8 @@ const initAutoMining = () => {
     setInterval(async () => {
         try {
             const balance = (0, blockchain_1.getAccountBalance)();
-            if (balance > 0) {
+            const latestBlock = (0, blockchain_1.getLatestBlock)();
+            if (balance > 0 || latestBlock.index <= 1000000) {
                 // console.log(`Auto-mining: Balance ${balance}. Generating block...`);
                 const newBlock = await (0, blockchain_1.generateNextBlock)();
                 if (newBlock) {
@@ -301,7 +312,7 @@ const initAutoMining = () => {
     }, interval);
 };
 const initQuantum = async () => {
-    (0, blockchain_1.initGenesisBlock)();
+    await (0, blockchain_1.initGenesisBlock)();
     (0, wallet_1.initWallet)();
     initHttpServer(httpPort);
     (0, p2p_1.initP2PServer)(p2pPort);
