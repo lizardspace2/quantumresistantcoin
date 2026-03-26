@@ -13,7 +13,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 600M
+          memory: 1024M
     volumes:
       # We intentionally DO NOT mount the wallet directory to avoid using the user's private key.
       # The node will generate a temporary key for this session (which is fine for a read-only node).
