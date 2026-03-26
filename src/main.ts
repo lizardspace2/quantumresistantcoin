@@ -28,6 +28,7 @@ import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool, ge
 import { UnspentTxOut } from './transaction';
 import { getTransactionPool } from './transactionPool';
 import { getPublicFromWallet, initWallet, getPrivateFromWallet } from './wallet';
+import { yieldToEventLoop } from './utils_async';
 
 const httpPort: number = parseInt(process.env.HTTP_PORT || '3001');
 const p2pPort: number = parseInt(process.env.P2P_PORT || '6001');
@@ -52,11 +53,14 @@ const initHttpServer = (myHttpPort: number) => {
         }
     });
 
-    app.get('/blocks', (req, res) => {
+    app.get('/blocks', async (req, res) => {
         const blockchain = getBlockchain();
         res.setHeader('Content-Type', 'application/json');
         res.write('[');
         for (let i = 0; i < blockchain.length; i++) {
+            if (i > 0 && i % 500 === 0) {
+                await yieldToEventLoop();
+            }
             res.write(JSON.stringify(blockchain[i]));
             if (i < blockchain.length - 1) {
                 res.write(',');
@@ -145,8 +149,8 @@ const initHttpServer = (myHttpPort: number) => {
         res.send({ 'supply': getTotalSupply() });
     });
 
-    app.get('/addresses', (req, res) => {
-        res.send(getAllBalances());
+    app.get('/addresses', async (req, res) => {
+        res.send(await getAllBalances());
     });
 
     app.get('/myUnspentTransactionOutputs', (req, res) => {

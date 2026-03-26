@@ -60,6 +60,8 @@ const initP2PServer = (p2pPort: number) => {
     // Active Resynchronization Loop
     // Explicitly ask peers for their latest block state every 10 seconds
     setInterval(() => {
+        if (getSyncStatus()) return; // Don't trigger if already syncing
+
         const latestBlockHeld = getLatestBlock();
         const latestIndex = latestBlockHeld.index;
 
@@ -276,22 +278,28 @@ const punishPeer = (ws: WebSocket, penaltyType: 'BLOCK' | 'TX' | 'SPAM') => {
 
 const handleBlockDataResponse = async (receivedBlocks: Block[], ws: WebSocket) => {
     if (receivedBlocks.length === 0) {
-        console.log('received block data size of 0');
+        console.log('Received block data size of 0. Peer might be at same height or has different chain.');
         return;
     }
-    console.log(`Received chunk of ${receivedBlocks.length} blocks. Processing...`);
-
+    
     // Sort just in case
     receivedBlocks.sort((a, b) => a.index - b.index);
+    
+    console.log(`Received chunk of ${receivedBlocks.length} blocks. Range: ${receivedBlocks[0].index} to ${receivedBlocks[receivedBlocks.length - 1].index}. Processing...`);
 
+    let blocksAdded = 0;
     for (const block of receivedBlocks) {
         const latestBlockHeld = getLatestBlock();
         if (block.index === latestBlockHeld.index + 1) {
             if (latestBlockHeld.hash === block.previousHash) {
                 // Happy path: Append
                 try {
-                    await addBlockToChain(block);
-                    // console.log(`Added block ${block.index}`);
+                    if (await addBlockToChain(block)) {
+                        blocksAdded++;
+                    } else {
+                        console.log(`Failed to add block ${block.index} to chain (validation failed)`);
+                        break; // Stop processing this chunk if a block fails
+                    }
                 } catch (e) {
                     console.log(`Error adding block ${block.index}: ${e.message}`);
                     punishPeer(ws, 'BLOCK');
@@ -299,14 +307,10 @@ const handleBlockDataResponse = async (receivedBlocks: Block[], ws: WebSocket) =
                 }
             } else {
                 console.log(`Block ${block.index} previous hash mismatch. Wanted ${latestBlockHeld.hash}, got ${block.previousHash}`);
-                // This implies a fork or bad chain. 
-                // If simple fork, we might need more complex recovery, but for sync, this usually means we are on wrong chain or they are.
                 return;
             }
         } else if (block.index > latestBlockHeld.index + 1) {
             console.log(`Received block ${block.index} but we are at ${latestBlockHeld.index}. Gap detected.`);
-            // Gap detected? Request from current + 1
-            // This happens if we receive a unordered chunk
             break;
         } else {
             // Already have it
@@ -314,16 +318,26 @@ const handleBlockDataResponse = async (receivedBlocks: Block[], ws: WebSocket) =
         }
     }
 
+    console.log(`Processed chunk: ${blocksAdded} blocks added.`);
+
     // After processing chunk, check if we need more
     const latestHeight = getLatestBlock().index;
     const peerHeight = peerHeights.get(ws) || 0;
 
     if (latestHeight < peerHeight) {
+        // If we didn't add any blocks but we are behind, and there was no error, we might be stuck.
+        if (blocksAdded === 0 && receivedBlocks.length > 0) {
+            console.log(`WARNING: No blocks were added from a chunk of ${receivedBlocks.length}. Potential sync stalemate at height ${latestHeight}.`);
+            // To avoid rapid-fire requests when stuck, we could add a delay or stop here.
+            // For now, we will try again after a short delay.
+            return;
+        }
+
         console.log(`Sync continued: ${latestHeight} / ${peerHeight}. Requesting next chunk...`);
         const nextChunkSize = 50;
         write(ws, queryBlockDataMsg(latestHeight + 1, nextChunkSize));
     } else {
-        console.log('Sync finished or caught up with peer.');
+        console.log(`Sync finished or caught up with peer at height ${latestHeight}.`);
         await saveBlockchain(true);
     }
 };

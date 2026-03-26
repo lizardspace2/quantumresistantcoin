@@ -73,6 +73,7 @@ let blockchain: Block[] = [];
 let globalState: State = new State();
 let unspentTxOuts: UnspentTxOut[] = [];
 let lastSaveHeight: number = 0;
+let cachedTotalSupply: number = 0;
 const BLOCKS_PER_SAVE_DURING_SYNC = 500;
 
 const TWO_POW_256 = new BigNumber(2).exponentiatedBy(256);
@@ -110,8 +111,7 @@ const initGenesisBlock = async (): Promise<void> => {
             }
 
             blockchain = loadedChain;
-            unspentTxOuts = tempUnspentTxOuts;
-            globalState = new State(unspentTxOuts);
+            setUnspentTxOuts(tempUnspentTxOuts);
             genesisBlock = blockchain[0];
             console.log('Blockchain loaded successfully. Height: ' + getLatestBlock().index);
             return;
@@ -165,7 +165,7 @@ const initGenesisBlock = async (): Promise<void> => {
         );
 
         blockchain = [genesisBlock];
-        unspentTxOuts = processTransactions(blockchain[0].data, [], 0);
+        setUnspentTxOuts(processTransactions(blockchain[0].data, [], 0));
 
         console.log('Genesis block initialized with Quantix address');
         await saveBlockchain(true);
@@ -186,7 +186,7 @@ const saveBlockchain = async (force: boolean = false) => {
     }
 
     // Low RAM Optimization: Use a write stream to avoid JSON.stringify on the whole array
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>(async (resolve, reject) => {
         try {
             if (!fs.existsSync(DATA_DIR)) {
                 fs.mkdirSync(DATA_DIR);
@@ -215,6 +215,11 @@ const saveBlockchain = async (force: boolean = false) => {
 
             writeStream.write('[');
             for (let i = 0; i < blockchain.length; i++) {
+                // Yield to event loop every 500 blocks to prevent blocking the API
+                if (i > 0 && i % 500 === 0) {
+                    await yieldToEventLoop();
+                }
+                
                 // Stringify individual blocks only, which is fast and small
                 writeStream.write(JSON.stringify(blockchain[i]));
                 if (i < blockchain.length - 1) {
@@ -242,6 +247,9 @@ const getUnspentTxOuts = (): UnspentTxOut[] => unspentTxOuts.map(u => new Unspen
 const setUnspentTxOuts = (newUnspentTxOut: UnspentTxOut[]) => {
     unspentTxOuts = newUnspentTxOut;
     globalState.setUnspentTxOuts(unspentTxOuts);
+    cachedTotalSupply = unspentTxOuts
+        .map((uTxO) => uTxO.amount)
+        .reduce((a, b) => a + b, 0);
 };
 
 const getLatestBlock = (): Block => blockchain[blockchain.length - 1];
@@ -633,19 +641,21 @@ const handleReceivedTransaction = (transaction: Transaction) => {
 };
 
 const getTotalSupply = (): number => {
-    return getUnspentTxOuts()
-        .map((uTxO) => uTxO.amount)
-        .reduce((a, b) => a + b, 0);
+    return cachedTotalSupply;
 };
 
-const getAllBalances = (): object => {
+const getAllBalances = async (): Promise<object> => {
     const balances = {};
-    getUnspentTxOuts().forEach((uTxO) => {
+    for (let i = 0; i < unspentTxOuts.length; i++) {
+        if (i > 0 && i % 1000 === 0) {
+            await yieldToEventLoop();
+        }
+        const uTxO = unspentTxOuts[i];
         if (!balances[uTxO.address]) {
             balances[uTxO.address] = 0;
         }
         balances[uTxO.address] += uTxO.amount;
-    });
+    }
     return balances;
 };
 
