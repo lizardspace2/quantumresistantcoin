@@ -1,6 +1,6 @@
 
-import { getPublicFromWallet, getPrivateFromWallet, getUnspentTxOuts } from './blockchain';
-import { createTransaction } from './wallet';
+import { getUnspentTxOuts } from './blockchain';
+import { createTransaction, getPublicFromWallet, getPrivateFromWallet } from './wallet';
 import { validateTransaction } from './transaction';
 import * as _ from 'lodash';
 
