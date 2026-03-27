@@ -8,13 +8,7 @@
     "resolveJsonModule": true
   },
   "include": [
-    "src/main.ts",
-    "src/block.ts",
-    "src/p2p.ts",
-    "src/util.ts",
-    "src/transaction.ts",
-    "src/wallet.ts",
-    "src/transactionPool.ts"
+    "src/**/*.ts"
   ],
   "exclude": [
     "node_modules"

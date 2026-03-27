@@ -636,6 +636,9 @@ const replaceChain = async (newBlocks: Block[]) => {
 
 const getSyncStatus = () => isSyncing;
 const setIsSyncing = (status: boolean) => {
+    if (isSyncing !== status) {
+        console.log(`Sync status changed: ${isSyncing} -> ${status}`);
+    }
     isSyncing = status;
 };
 
