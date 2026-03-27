@@ -74,7 +74,7 @@ let globalState: State = new State();
 let unspentTxOuts: UnspentTxOut[] = [];
 let lastSaveHeight: number = 0;
 let cachedTotalSupply: number = 0;
-const BLOCKS_PER_SAVE_DURING_SYNC = 500;
+const BLOCKS_PER_SAVE_DURING_SYNC = 1000;
 
 const TWO_POW_256 = new BigNumber(2).exponentiatedBy(256);
 
@@ -635,6 +635,9 @@ const replaceChain = async (newBlocks: Block[]) => {
 };
 
 const getSyncStatus = () => isSyncing;
+const setIsSyncing = (status: boolean) => {
+    isSyncing = status;
+};
 
 const handleReceivedTransaction = (transaction: Transaction) => {
     addToTransactionPool(transaction, getUnspentTxOuts());
@@ -672,6 +675,6 @@ export {
     getBlockHeaders, isValidBlockHeader,
     getBlocks,
     getTotalSupply, getAllBalances,
-    getSyncStatus,
+    getSyncStatus, setIsSyncing,
     saveBlockchain
 };

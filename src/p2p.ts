@@ -2,7 +2,7 @@ import WebSocket from 'ws';
 import { Server } from 'ws';
 import {
     addBlockToChain, Block, getBlockchain, getLatestBlock, handleReceivedTransaction, isValidBlockStructure,
-    replaceChain, getBlockHeaders, isValidBlockHeader, getSyncStatus, getBlocks, saveBlockchain
+    replaceChain, getBlockHeaders, isValidBlockHeader, getSyncStatus, getBlocks, saveBlockchain, setIsSyncing
 } from './blockchain';
 import { Transaction } from './transaction';
 import { getTransactionPool } from './transactionPool';
@@ -60,7 +60,8 @@ const initP2PServer = (p2pPort: number) => {
     // Active Resynchronization Loop
     // Explicitly ask peers for their latest block state every 10 seconds
     setInterval(() => {
-        if (getSyncStatus()) return; // Don't trigger if already syncing
+        // No longer returning early if getSyncStatus() is true, 
+        // to avoid deadlocks if a sync-peer disconnects.
 
         const latestBlockHeld = getLatestBlock();
         const latestIndex = latestBlockHeld.index;
@@ -334,7 +335,7 @@ const handleBlockDataResponse = async (receivedBlocks: Block[], ws: WebSocket) =
         }
 
         console.log(`Sync continued: ${latestHeight} / ${peerHeight}. Requesting next chunk...`);
-        const nextChunkSize = 50;
+        const nextChunkSize = 200; // Increased chunk size for faster sync
         write(ws, queryBlockDataMsg(latestHeight + 1, nextChunkSize));
     } else {
         console.log(`Sync finished or caught up with peer at height ${latestHeight}.`);
@@ -400,10 +401,14 @@ const handleBinHeadersResponse = async (receivedHeaders: Block[], ws: WebSocket)
     // Update peer height knowledge
     peerHeights.set(ws, latestHeader.index);
 
-    if (latestHeader.index > latestHeldBlock.index) {
-        console.log(`Peer has better chain (height ${latestHeader.index}). Starting batch sync from ${latestHeldBlock.index + 1}`);
-        // Instead of QUERY_ALL, start chunk request
-        write(ws, queryBlockDataMsg(latestHeldBlock.index + 1, 50));
+    // Get current height after potential block additions from other peers
+    const currentHeight = getLatestBlock().index;
+
+    if (latestHeader.index > currentHeight) {
+        // If the peer's latest header is greater than our current height, we might be behind.
+        // We use `currentHeight` here to ensure we're always comparing against the most up-to-date chain height.
+        console.log(`Peer has better chain (height ${latestHeader.index}). Starting batch sync from ${currentHeight + 1}`);
+        write(ws, queryBlockDataMsg(currentHeight + 1, 200));
     }
 };
 
