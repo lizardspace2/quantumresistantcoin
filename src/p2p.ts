@@ -71,7 +71,7 @@ const initP2PServer = (p2pPort: number) => {
             const peerHeight = peerHeights.get(ws) || 0;
             if (peerHeight > latestIndex) {
                 console.log(`Active Sync: Local height ${latestIndex} < Peer height ${peerHeight}. Requesting blocks...`);
-                write(ws, queryBlockDataMsg(latestIndex + 1, 50));
+                write(ws, queryBlockDataMsg(latestIndex + 1, 200));
             } else {
                 // Or just ping to check if they have new stuff (optional, but good for liveness)
                 write(ws, queryChainLengthMsg());
