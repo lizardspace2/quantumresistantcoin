@@ -101,11 +101,17 @@ const initGenesisBlock = async () => {
             }
             let tempUnspentTxOuts = [];
             for (const block of loadedChain) {
-                const retVal = (0, transaction_1.processTransactions)(block.data, tempUnspentTxOuts, block.index);
-                if (retVal === null) {
-                    throw Error('Invalid transactions in stored blockchain block ' + block.index);
+                try {
+                    const retVal = (0, transaction_1.processTransactions)(block.data, tempUnspentTxOuts, block.index);
+                    if (retVal === null) {
+                        console.error(`FATAL ERROR: Block ${block.index} has invalid transactions.`);
+                        throw Error('Invalid transactions in stored blockchain block ' + block.index);
+                    }
+                    tempUnspentTxOuts = retVal;
+                } catch (err) {
+                    console.error(`FAILED to process block at index ${block.index}`);
+                    throw err;
                 }
-                tempUnspentTxOuts = retVal;
             }
             blockchain = loadedChain;
             unspentTxOuts = tempUnspentTxOuts;
@@ -115,13 +121,12 @@ const initGenesisBlock = async () => {
             return;
         }
         catch (e) {
-            console.log('Error loading blockchain from file, starting fresh: ' + e.message);
-            // If genesis mismatch, we might want to actually stop or force a reset, but "starting fresh" usually implies overwriting.
-            // However, the original code fell through to create a new genesis block.
-            // If the error was fatal (like Genesis Mismatch), we probably shouldn't just overwrite without user consent, but for now, "starting fresh" effectively resets it.
-            // But wait, if I throw in the try block, it catches here. 
-            // The catch block says "starting fresh", then proceeds to create a new genesis block and OVERWRITE the file.
-            // This effectively "fixes" the mismatch by wiping the bad chain. This is aggressive but solves the sync issue.
+            console.error('****************************************************************');
+            console.error('CRITICAL ERROR LOADING BLOCKCHAIN: ' + e.message);
+            console.error('To protect your data, the node will NOT start fresh.');
+            console.error('PLEASE MANUALLY INVESTIGATE data/blockchain.json');
+            console.error('****************************************************************');
+            process.exit(1);
         }
     }
     try {
