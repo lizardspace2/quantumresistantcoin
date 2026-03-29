@@ -52,6 +52,8 @@ const initP2PServer = (p2pPort) => {
     // Active Resynchronization Loop
     // Explicitly ask peers for their latest block state every 10 seconds
     setInterval(() => {
+        // No longer returning early if getSyncStatus() is true, 
+        // to avoid deadlocks if a sync-peer disconnects.
         const latestBlockHeld = (0, blockchain_1.getLatestBlock)();
         const latestIndex = latestBlockHeld.index;
         // Check if we are behind any peer
@@ -59,7 +61,7 @@ const initP2PServer = (p2pPort) => {
             const peerHeight = peerHeights.get(ws) || 0;
             if (peerHeight > latestIndex) {
                 console.log(`Active Sync: Local height ${latestIndex} < Peer height ${peerHeight}. Requesting blocks...`);
-                write(ws, queryBlockDataMsg(latestIndex + 1, 50));
+                write(ws, queryBlockDataMsg(latestIndex + 1, 200));
             }
             else {
                 // Or just ping to check if they have new stuff (optional, but good for liveness)
@@ -262,20 +264,26 @@ const punishPeer = (ws, penaltyType) => {
 };
 const handleBlockDataResponse = async (receivedBlocks, ws) => {
     if (receivedBlocks.length === 0) {
-        console.log('received block data size of 0');
+        console.log('Received block data size of 0. Peer might be at same height or has different chain.');
         return;
     }
-    console.log(`Received chunk of ${receivedBlocks.length} blocks. Processing...`);
     // Sort just in case
     receivedBlocks.sort((a, b) => a.index - b.index);
+    console.log(`Received chunk of ${receivedBlocks.length} blocks. Range: ${receivedBlocks[0].index} to ${receivedBlocks[receivedBlocks.length - 1].index}. Processing...`);
+    let blocksAdded = 0;
     for (const block of receivedBlocks) {
         const latestBlockHeld = (0, blockchain_1.getLatestBlock)();
         if (block.index === latestBlockHeld.index + 1) {
             if (latestBlockHeld.hash === block.previousHash) {
                 // Happy path: Append
                 try {
-                    await (0, blockchain_1.addBlockToChain)(block);
-                    // console.log(`Added block ${block.index}`);
+                    if (await (0, blockchain_1.addBlockToChain)(block)) {
+                        blocksAdded++;
+                    }
+                    else {
+                        console.log(`Failed to add block ${block.index} to chain (validation failed)`);
+                        break; // Stop processing this chunk if a block fails
+                    }
                 }
                 catch (e) {
                     console.log(`Error adding block ${block.index}: ${e.message}`);
@@ -285,15 +293,11 @@ const handleBlockDataResponse = async (receivedBlocks, ws) => {
             }
             else {
                 console.log(`Block ${block.index} previous hash mismatch. Wanted ${latestBlockHeld.hash}, got ${block.previousHash}`);
-                // This implies a fork or bad chain. 
-                // If simple fork, we might need more complex recovery, but for sync, this usually means we are on wrong chain or they are.
                 return;
             }
         }
         else if (block.index > latestBlockHeld.index + 1) {
             console.log(`Received block ${block.index} but we are at ${latestBlockHeld.index}. Gap detected.`);
-            // Gap detected? Request from current + 1
-            // This happens if we receive a unordered chunk
             break;
         }
         else {
@@ -301,16 +305,24 @@ const handleBlockDataResponse = async (receivedBlocks, ws) => {
             // console.log(`Ignored block ${block.index} (already have ${latestBlockHeld.index})`);
         }
     }
+    console.log(`Processed chunk: ${blocksAdded} blocks added.`);
     // After processing chunk, check if we need more
     const latestHeight = (0, blockchain_1.getLatestBlock)().index;
     const peerHeight = peerHeights.get(ws) || 0;
     if (latestHeight < peerHeight) {
+        // If we didn't add any blocks but we are behind, and there was no error, we might be stuck.
+        if (blocksAdded === 0 && receivedBlocks.length > 0) {
+            console.log(`WARNING: No blocks were added from a chunk of ${receivedBlocks.length}. Potential sync stalemate at height ${latestHeight}.`);
+            // To avoid rapid-fire requests when stuck, we could add a delay or stop here.
+            // For now, we will try again after a short delay.
+            return;
+        }
         console.log(`Sync continued: ${latestHeight} / ${peerHeight}. Requesting next chunk...`);
-        const nextChunkSize = 50;
+        const nextChunkSize = 200; // Increased chunk size for faster sync
         write(ws, queryBlockDataMsg(latestHeight + 1, nextChunkSize));
     }
     else {
-        console.log('Sync finished or caught up with peer.');
+        console.log(`Sync finished or caught up with peer at height ${latestHeight}.`);
         await (0, blockchain_1.saveBlockchain)(true);
     }
 };
@@ -372,10 +384,13 @@ const handleBinHeadersResponse = async (receivedHeaders, ws) => {
     const latestHeldBlock = (0, blockchain_1.getLatestBlock)();
     // Update peer height knowledge
     peerHeights.set(ws, latestHeader.index);
-    if (latestHeader.index > latestHeldBlock.index) {
-        console.log(`Peer has better chain (height ${latestHeader.index}). Starting batch sync from ${latestHeldBlock.index + 1}`);
-        // Instead of QUERY_ALL, start chunk request
-        write(ws, queryBlockDataMsg(latestHeldBlock.index + 1, 50));
+    // Get current height after potential block additions from other peers
+    const currentHeight = (0, blockchain_1.getLatestBlock)().index;
+    if (latestHeader.index > currentHeight) {
+        // If the peer's latest header is greater than our current height, we might be behind.
+        // We use `currentHeight` here to ensure we're always comparing against the most up-to-date chain height.
+        console.log(`Peer has better chain (height ${latestHeader.index}). Starting batch sync from ${currentHeight + 1}`);
+        write(ws, queryBlockDataMsg(currentHeight + 1, 200));
     }
 };
 const broadcastLatest = () => {

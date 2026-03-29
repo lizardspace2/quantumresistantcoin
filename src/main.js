@@ -51,6 +51,7 @@ const blockchain_1 = require("./blockchain");
 const p2p_1 = require("./p2p");
 const transactionPool_1 = require("./transactionPool");
 const wallet_1 = require("./wallet");
+const utils_async_1 = require("./utils_async");
 const httpPort = parseInt(process.env.HTTP_PORT || '3001');
 const p2pPort = parseInt(process.env.P2P_PORT || '6001');
 const safeMode = process.env.SAFE_MODE === 'true';
@@ -70,11 +71,14 @@ const initHttpServer = (myHttpPort) => {
             res.status(400).send(err.message);
         }
     });
-    app.get('/blocks', (req, res) => {
+    app.get('/blocks', async (req, res) => {
         const blockchain = (0, blockchain_1.getBlockchain)();
         res.setHeader('Content-Type', 'application/json');
         res.write('[');
         for (let i = 0; i < blockchain.length; i++) {
+            if (i > 0 && i % 500 === 0) {
+                await (0, utils_async_1.yieldToEventLoop)();
+            }
             res.write(JSON.stringify(blockchain[i]));
             if (i < blockchain.length - 1) {
                 res.write(',');
@@ -151,8 +155,8 @@ const initHttpServer = (myHttpPort) => {
     app.get('/totalSupply', (req, res) => {
         res.send({ 'supply': (0, blockchain_1.getTotalSupply)() });
     });
-    app.get('/addresses', (req, res) => {
-        res.send((0, blockchain_1.getAllBalances)());
+    app.get('/addresses', async (req, res) => {
+        res.send(await (0, blockchain_1.getAllBalances)());
     });
     app.get('/myUnspentTransactionOutputs', (req, res) => {
         res.send((0, blockchain_1.getMyUnspentTransactionOutputs)());
