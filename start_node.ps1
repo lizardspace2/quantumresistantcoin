@@ -7,7 +7,7 @@ while ($true) {
     Write-Host "Launching node (Attempt $retryCount)..." -ForegroundColor Green
     
     # Run the compile command first to ensure latest code
-    call npm run compile
+    npm run compile
     
     # Start the node
     # Using 'call' if it was a batch, but in PS just running it is fine.

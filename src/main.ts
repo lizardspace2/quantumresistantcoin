@@ -329,8 +329,9 @@ const initQuantum = async () => {
     }
 
     const bootNodes = [
-        'ws://35.225.236.73:6001'   // Genesis Node
-        // 'ws://136.115.214.0:6001'   // REMOVED: Do not add self-address here, it causes loops!
+        'ws://172.20.0.10:6001', // Master Node
+        'ws://172.20.0.20:6001', // Explorer Node
+        'ws://172.20.0.30:6001'  // Standard Node
     ];
     let peers = bootNodes;
 

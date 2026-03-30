@@ -1,0 +1,65 @@
+version: '3.8'
+services:
+  master-node:
+    build: .
+    container_name: quantix-master
+    restart: always
+    env_file: .env
+    ports:
+      - "3001:3001"
+      - "6001:6001"
+    volumes:
+      - ./data:/app/data
+      - ./node/wallet:/app/node/wallet
+    networks:
+      blockchain-net:
+        ipv4_address: 172.20.0.10
+
+  explorer-node:
+    build: .
+    container_name: quantix-explorer
+    restart: always
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+      - SAFE_MODE=true
+      - PEERS=ws://quantix-master:6001
+    ports:
+      - "3002:3001"
+      - "6002:6001"
+    volumes:
+      - ./data-explorer:/app/data
+    networks:
+      blockchain-net:
+        ipv4_address: 172.20.0.20
+    depends_on:
+      - master-node
+
+  standard-node:
+    build: .
+    container_name: quantix-standard
+    restart: always
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+      - SAFE_MODE=false
+      - PEERS=ws://quantix-master:6001
+      - ENABLE_MINING=true
+    ports:
+      - "3003:3001"
+      - "6003:6001"
+    volumes:
+      - ./data-standard:/app/data
+      - ./node/wallet-standard:/app/node/wallet
+    networks:
+      blockchain-net:
+        ipv4_address: 172.20.0.30
+    depends_on:
+      - master-node
+
+networks:
+  blockchain-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
