@@ -57,6 +57,18 @@ services:
     depends_on:
       - master-node
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: quantix-tunnel
+    restart: always
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel run
+    volumes:
+      - ./cloudflared/config.yaml:/etc/cloudflared/config.yaml:ro
+    networks:
+      - blockchain-net
+
 networks:
   blockchain-net:
     driver: bridge

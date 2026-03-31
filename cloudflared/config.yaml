@@ -1,0 +1,18 @@
+# Cloudflare Tunnel Configuration
+# This file defines how incoming traffic from Cloudflare is routed to your Docker containers.
+
+ingress:
+  # Master Node (API)
+  - hostname: master.quantix-network.com
+    service: http://quantix-master:3001
+  
+  # Explorer Node (API)
+  - hostname: explorer.quantix-network.com
+    service: http://quantix-explorer:3001
+  
+  # Standard Node (API)
+  - hostname: standard.quantix-network.com
+    service: http://quantix-standard:3001
+
+  # Catch-all
+  - service: http_status:404
