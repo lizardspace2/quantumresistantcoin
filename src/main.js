@@ -324,7 +324,9 @@ const initQuantum = async () => {
         initAutoMining();
     }
     const bootNodes = [
-    // 'ws://35.225.236.73:6001'   // Genesis Node - REMOVED: Peer doesn't exist anymore
+        'ws://172.20.0.10:6001',
+        'ws://172.20.0.20:6001',
+        'ws://172.20.0.30:6001' // Standard Node
     ];
     let peers = bootNodes;
     if (process.env.PEERS) {
