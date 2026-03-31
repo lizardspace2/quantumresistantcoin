@@ -3,16 +3,20 @@
 
 ingress:
   # Master Node (API)
-  - hostname: master.quantix-network.com
+  - hostname: master.quantumresistantcoin.com
     service: http://quantix-master:3001
   
   # Explorer Node (API)
-  - hostname: explorer.quantix-network.com
+  - hostname: node-explorer.quantumresistantcoin.com
     service: http://quantix-explorer:3001
   
   # Standard Node (API)
-  - hostname: standard.quantix-network.com
+  - hostname: standard.quantumresistantcoin.com
     service: http://quantix-standard:3001
+
+  # Master Node (P2P WebSocket)
+  - hostname: p2p.quantumresistantcoin.com
+    service: http://quantix-master:6001
 
   # Catch-all
   - service: http_status:404
