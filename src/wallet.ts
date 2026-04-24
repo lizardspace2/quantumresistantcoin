@@ -167,18 +167,12 @@ const filterTxPoolTxs = (unspentTxOuts: UnspentTxOut[], transactionPool: Transac
         .flatten()
         .value();
 
-    const removable: UnspentTxOut[] = [];
-    for (const unspentTxOut of unspentTxOuts) {
-        const txIn = _.find(txIns, (aTxIn: TxIn) => {
-            return aTxIn.txOutIndex === unspentTxOut.txOutIndex && aTxIn.txOutId === unspentTxOut.txOutId;
-        });
-
-        if (txIn !== undefined) {
-            removable.push(unspentTxOut);
-        }
+    const txInMap = new Map<string, boolean>();
+    for (const txIn of txIns) {
+        txInMap.set(txIn.txOutId + txIn.txOutIndex, true);
     }
 
-    return _.without(unspentTxOuts, ...removable);
+    return unspentTxOuts.filter(u => !txInMap.has(u.txOutId + u.txOutIndex));
 };
 
 const findTxOutsForAmount = (amount: number, myUnspentTxOuts: UnspentTxOut[]) => {
@@ -194,7 +188,7 @@ const findTxOutsForAmount = (amount: number, myUnspentTxOuts: UnspentTxOut[]) =>
     }
 
     const eMsg = 'Cannot create transaction from the available unspent transaction outputs.' +
-        ' Required amount:' + amount + '. Available unspentTxOuts:' + JSON.stringify(myUnspentTxOuts);
+        ' Required amount:' + amount + '. Available UTXOs count:' + myUnspentTxOuts.length;
     throw Error(eMsg);
 };
 

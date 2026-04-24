@@ -184,6 +184,22 @@ const initHttpServer = (myHttpPort: number) => {
         res.send({ 'balance': balance });
     });
 
+    // Lightweight balance check for any address — returns only the summed amount,
+    // not the full UTXO list. Ideal for frontends dealing with highly fragmented wallets.
+    app.get('/balance/:address', (req, res) => {
+        const address = req.params.address;
+        const allUTXOs = getUnspentTxOuts();
+        let balance = 0;
+        let utxoCount = 0;
+        for (let i = 0; i < allUTXOs.length; i++) {
+            if (allUTXOs[i].address === address) {
+                balance += allUTXOs[i].amount;
+                utxoCount++;
+            }
+        }
+        res.send({ address, balance, utxoCount });
+    });
+
     app.get('/address', (req, res) => {
         const address: string = getPublicFromWallet();
         res.send({ 'address': address });
@@ -285,7 +301,7 @@ const initHttpServer = (myHttpPort: number) => {
         });
     });
 
-    app.listen(myHttpPort, () => {
+    app.listen(myHttpPort, '0.0.0.0', () => {
         console.log('Listening http on port: ' + myHttpPort);
         if (safeMode) {
             console.log('Safe mode enabled: invalidating all non-read-only endpoints');

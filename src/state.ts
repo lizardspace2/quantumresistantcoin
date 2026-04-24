@@ -3,8 +3,11 @@ import { UnspentTxOut, Transaction, TxIn, TxOut } from './transaction';
 import * as CryptoJS from 'crypto-js';
 
 const calculateStateRoot = (unspentTxOuts: UnspentTxOut[]): string => {
+    if (unspentTxOuts.length === 0) {
+        return CryptoJS.SHA256("").toString();
+    }
+    
     // Sort by txOutId then txOutIndex to ensure consistent hash
-    // Standard lexicographical sort for multiple fields
     const sortedUTXOs = [...unspentTxOuts].sort((a, b) => {
         if (a.txOutId < b.txOutId) return -1;
         if (a.txOutId > b.txOutId) return 1;
@@ -13,26 +16,24 @@ const calculateStateRoot = (unspentTxOuts: UnspentTxOut[]): string => {
         return 0;
     });
 
-    // We must match the network's string representation exactly.
-    // The original code used `+ u.amount` which uses default .toString()
-    const utxoStrings = sortedUTXOs.map(u => u.txOutId + u.txOutIndex + u.address + u.amount);
-
-    if (utxoStrings.length === 0) {
-        return CryptoJS.SHA256("").toString();
+    let hashInput = "";
+    for (let i = 0; i < sortedUTXOs.length; i++) {
+        const u = sortedUTXOs[i];
+        hashInput += u.txOutId + u.txOutIndex + u.address + u.amount;
     }
 
-    return CryptoJS.SHA256(utxoStrings.join('')).toString();
+    return CryptoJS.SHA256(hashInput).toString();
 };
 
 export class State {
     private unspentTxOuts: UnspentTxOut[];
 
     constructor(initialUnspentTxOuts: UnspentTxOut[] = []) {
-        this.unspentTxOuts = initialUnspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
+        this.unspentTxOuts = initialUnspentTxOuts;
     }
 
     public getUnspentTxOuts(): UnspentTxOut[] {
-        return this.unspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
+        return this.unspentTxOuts;
     }
 
     public setUnspentTxOuts(newUnspentTxOuts: UnspentTxOut[]) {

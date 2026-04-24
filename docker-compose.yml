@@ -12,8 +12,7 @@ services:
       - ./data:/app/data
       - ./node/wallet:/app/node/wallet
     networks:
-      blockchain-net:
-        ipv4_address: 172.20.0.10
+      - quantix-universal-net
 
   explorer-node:
     build: .
@@ -30,8 +29,7 @@ services:
     volumes:
       - ./data-explorer:/app/data
     networks:
-      blockchain-net:
-        ipv4_address: 172.20.0.20
+      - quantix-universal-net
     depends_on:
       - master-node
 
@@ -52,8 +50,7 @@ services:
       - ./data-standard:/app/data
       - ./node/wallet-standard:/app/node/wallet
     networks:
-      blockchain-net:
-        ipv4_address: 172.20.0.30
+      - quantix-universal-net
     depends_on:
       - master-node
 
@@ -67,11 +64,8 @@ services:
     volumes:
       - ./cloudflared/config.yaml:/etc/cloudflared/config.yaml:ro
     networks:
-      - blockchain-net
+      - quantix-universal-net
 
 networks:
-  blockchain-net:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+  quantix-universal-net:
+    external: true

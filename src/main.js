@@ -281,7 +281,7 @@ const initHttpServer = (myHttpPort) => {
             }))
         });
     });
-    app.listen(myHttpPort, () => {
+    app.listen(myHttpPort, '0.0.0.0', () => {
         console.log('Listening http on port: ' + myHttpPort);
         if (safeMode) {
             console.log('Safe mode enabled: invalidating all non-read-only endpoints');

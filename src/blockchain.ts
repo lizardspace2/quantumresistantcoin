@@ -248,7 +248,9 @@ const mkdirSync = (path: string) => fs.mkdirSync(path);
 
 const getBlockchain = (): Block[] => blockchain;
 
-const getUnspentTxOuts = (): UnspentTxOut[] => unspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
+const getUnspentTxOuts = (): UnspentTxOut[] => unspentTxOuts;
+
+const getUnspentTxOutsClone = (): UnspentTxOut[] => unspentTxOuts.map(u => new UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
 
 const setUnspentTxOuts = (newUnspentTxOut: UnspentTxOut[]) => {
     unspentTxOuts = newUnspentTxOut;
@@ -670,7 +672,7 @@ const getAllBalances = async (): Promise<object> => {
 };
 
 export {
-    Block, getBlockchain, getUnspentTxOuts, getLatestBlock, sendTransaction,
+    Block, getBlockchain, getUnspentTxOuts, getUnspentTxOutsClone, getLatestBlock, sendTransaction,
     generateRawNextBlock, generateNextBlock, generatenextBlockWithTransaction,
     handleReceivedTransaction, getMyUnspentTransactionOutputs,
     getAccountBalance,
