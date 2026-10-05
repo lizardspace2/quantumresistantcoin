@@ -42,7 +42,9 @@ services:
       - P2P_PORT=6001
       - SAFE_MODE=true
       - PEERS=ws://quantix-master:6001
-      - ENABLE_MINING=true
+      # Follower node only — mining while behind creates a forked chain
+      # (emergency mining produced the previous-hash mismatch at 19221)
+      - ENABLE_MINING=false
     ports:
       - "3003:3001"
       - "6003:6001"
