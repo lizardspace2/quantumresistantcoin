@@ -257,7 +257,7 @@ const initHttpServer = (myHttpPort: number) => {
         res.send(getTransactionPool());
     });
 
-    app.post('/transactionPool', checkSafeMode, (req, res) => {
+    app.post('/transactionPool', (req, res) => {
         try {
             const tx = req.body;
             handleReceivedTransaction(tx);

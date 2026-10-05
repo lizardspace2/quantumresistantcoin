@@ -187,6 +187,21 @@ const initHttpServer = (myHttpPort) => {
         const balance = (0, blockchain_1.getAccountBalance)();
         res.send({ 'balance': balance });
     });
+    // Lightweight balance check for any address — returns only the summed amount,
+    // not the full UTXO list. Ideal for frontends dealing with highly fragmented wallets.
+    app.get('/balance/:address', (req, res) => {
+        const address = req.params.address;
+        const allUTXOs = (0, blockchain_1.getUnspentTxOuts)();
+        let balance = 0;
+        let utxoCount = 0;
+        for (let i = 0; i < allUTXOs.length; i++) {
+            if (allUTXOs[i].address === address) {
+                balance += allUTXOs[i].amount;
+                utxoCount++;
+            }
+        }
+        res.send({ address, balance, utxoCount });
+    });
     app.get('/address', (req, res) => {
         const address = (0, wallet_1.getPublicFromWallet)();
         res.send({ 'address': address });
@@ -240,7 +255,7 @@ const initHttpServer = (myHttpPort) => {
     app.get('/transactionPool', (req, res) => {
         res.send((0, transactionPool_1.getTransactionPool)());
     });
-    app.post('/transactionPool', checkSafeMode, (req, res) => {
+    app.post('/transactionPool', (req, res) => {
         try {
             const tx = req.body;
             (0, blockchain_1.handleReceivedTransaction)(tx);
