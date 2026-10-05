@@ -189,16 +189,11 @@ const filterTxPoolTxs = (unspentTxOuts, transactionPool) => {
         .map((tx) => tx.txIns)
         .flatten()
         .value();
-    const removable = [];
-    for (const unspentTxOut of unspentTxOuts) {
-        const txIn = lodash_1.default.find(txIns, (aTxIn) => {
-            return aTxIn.txOutIndex === unspentTxOut.txOutIndex && aTxIn.txOutId === unspentTxOut.txOutId;
-        });
-        if (txIn !== undefined) {
-            removable.push(unspentTxOut);
-        }
+    const txInMap = new Map();
+    for (const txIn of txIns) {
+        txInMap.set(txIn.txOutId + txIn.txOutIndex, true);
     }
-    return lodash_1.default.without(unspentTxOuts, ...removable);
+    return unspentTxOuts.filter(u => !txInMap.has(u.txOutId + u.txOutIndex));
 };
 const findTxOutsForAmount = (amount, myUnspentTxOuts) => {
     let currentAmount = 0;
@@ -212,7 +207,7 @@ const findTxOutsForAmount = (amount, myUnspentTxOuts) => {
         }
     }
     const eMsg = 'Cannot create transaction from the available unspent transaction outputs.' +
-        ' Required amount:' + amount + '. Available unspentTxOuts:' + JSON.stringify(myUnspentTxOuts);
+        ' Required amount:' + amount + '. Available UTXOs count:' + myUnspentTxOuts.length;
     throw Error(eMsg);
 };
 const createTxOuts = (receiverAddress, myAddress, amount, leftOverAmount) => {

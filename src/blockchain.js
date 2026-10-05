@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.saveBlockchain = exports.setIsSyncing = exports.getSyncStatus = exports.getAllBalances = exports.getTotalSupply = exports.getBlocks = exports.isValidBlockHeader = exports.getBlockHeaders = exports.initGenesisBlock = exports.getCumulativeDifficulty = exports.addBlockToChain = exports.replaceChain = exports.isValidBlockStructure = exports.getAccountBalance = exports.getMyUnspentTransactionOutputs = exports.handleReceivedTransaction = exports.generatenextBlockWithTransaction = exports.generateNextBlock = exports.generateRawNextBlock = exports.sendTransaction = exports.getLatestBlock = exports.getUnspentTxOuts = exports.getBlockchain = exports.Block = void 0;
+exports.saveBlockchain = exports.setIsSyncing = exports.getSyncStatus = exports.getAllBalances = exports.getTotalSupply = exports.getBlocks = exports.isValidBlockHeader = exports.getBlockHeaders = exports.initGenesisBlock = exports.getCumulativeDifficulty = exports.addBlockToChain = exports.replaceChain = exports.isValidBlockStructure = exports.getAccountBalance = exports.getMyUnspentTransactionOutputs = exports.handleReceivedTransaction = exports.generatenextBlockWithTransaction = exports.generateNextBlock = exports.generateRawNextBlock = exports.sendTransaction = exports.getLatestBlock = exports.getUnspentTxOutsClone = exports.getUnspentTxOuts = exports.getBlockchain = exports.Block = void 0;
 /*
  * Copyright 2026 lizrdspace2
  *
@@ -229,8 +229,10 @@ const readFileSync = (path, encoding) => fs.readFileSync(path, encoding);
 const mkdirSync = (path) => fs.mkdirSync(path);
 const getBlockchain = () => blockchain;
 exports.getBlockchain = getBlockchain;
-const getUnspentTxOuts = () => unspentTxOuts.map(u => new transaction_1.UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
+const getUnspentTxOuts = () => unspentTxOuts;
 exports.getUnspentTxOuts = getUnspentTxOuts;
+const getUnspentTxOutsClone = () => unspentTxOuts.map(u => new transaction_1.UnspentTxOut(u.txOutId, u.txOutIndex, u.address, u.amount));
+exports.getUnspentTxOutsClone = getUnspentTxOutsClone;
 const setUnspentTxOuts = (newUnspentTxOut) => {
     unspentTxOuts = newUnspentTxOut;
     globalState.setUnspentTxOuts(unspentTxOuts);
