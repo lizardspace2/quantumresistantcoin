@@ -138,7 +138,14 @@ const initHttpServer = (myHttpPort: number) => {
     app.get('/address/:address', (req: express.Request, res: express.Response) => {
         const unspentTxOuts: UnspentTxOut[] =
             getUnspentTxOuts().filter((uTxO: UnspentTxOut) => uTxO.address === req.params.address);
-        res.send({ 'unspentTxOuts': unspentTxOuts });
+        const limit = parseInt(req.query.limit as string);
+        const totalBalance = unspentTxOuts.reduce((acc, u) => acc + u.amount, 0);
+        // ?limit=N returns only the N largest UTXOs — enough for a wallet to build
+        // a transaction without downloading a heavily fragmented set (90+ MB).
+        const page = limit > 0
+            ? [...unspentTxOuts].sort((a, b) => b.amount - a.amount).slice(0, limit)
+            : unspentTxOuts;
+        res.send({ 'unspentTxOuts': page, 'totalBalance': totalBalance, 'totalUtxos': unspentTxOuts.length });
     });
 
     app.get('/unspentTransactionOutputs', (req, res) => {
