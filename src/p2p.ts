@@ -1,4 +1,4 @@
-import WebSocket from 'ws';
+import WebSocket, { RawData } from 'ws';
 import { Server } from 'ws';
 import {
     addBlockToChain, Block, getBlockchain, getLatestBlock, handleReceivedTransaction, isValidBlockStructure,
@@ -103,11 +103,12 @@ const JSONToObject = <T>(data: string): T => {
 };
 
 const initMessageHandler = (ws: WebSocket) => {
-    ws.on('message', (data: string) => {
+    ws.on('message', (data: RawData) => {
         try {
-            const message: Message = JSONToObject<Message>(data);
+            const text = data.toString();
+            const message: Message = JSONToObject<Message>(text);
             if (message === null) {
-                console.log('could not parse received JSON message: ' + data);
+                console.log('could not parse received JSON message: ' + text);
                 return;
             }
             // console.log('Received message: %s', JSON.stringify(message));
