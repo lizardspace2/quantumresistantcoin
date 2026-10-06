@@ -272,10 +272,12 @@ const getBlockHeaders = (start: number, end: number): Block[] => {
 };
 
 const getBlocks = (start: number, end: number): Block[] => {
-    if (start < 0 || end > blockchain.length || start > end) {
+    // Clamp the range to the actual chain — a peer asking past our tip
+    // should still receive the blocks we do have, not nothing.
+    if (start < 0 || start > end || start >= blockchain.length) {
         return [];
     }
-    return blockchain.slice(start, end);
+    return blockchain.slice(start, Math.min(end, blockchain.length));
 };
 
 const BLOCK_GENERATION_INTERVAL: number = 300;
