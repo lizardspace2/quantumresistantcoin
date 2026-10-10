@@ -240,9 +240,9 @@ on, verify the return to normal in `watchdog.log`.
   indexer polls every 5 min and must first catch up on the blocks mined
   during PC1's absence. No data loss — just a display delay.
 - **A few seconds of relayer overlap** between PC2's stack starting and
-  PC1's actually dying: the non-atomic claim leaves a residual
-  double-mint risk — to be fixed eventually with an
-  `.eq('status','pending')` condition on the Supabase update.
+  PC1's actually dying: tolerated — the mint claim is atomic (the
+  conditional `pending/confirmed → minting` update matches at most one
+  relayer).
 - **Bridge keys compromised in git history**: the `.env` /
   `*_keys.json` files were committed then untracked — GitHub history
   still contains them. Vault key rotation recommended.
