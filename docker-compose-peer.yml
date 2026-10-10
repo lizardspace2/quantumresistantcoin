@@ -31,6 +31,9 @@ services:
         # This alias makes that name resolve to THIS node on PC2.
         aliases:
           - quantix-master
+          # node-explorer.quantumresistantcoin.com also resolves to this
+          # node during failover so the explorer indexer keeps working
+          - quantix-explorer
 
 networks:
   # Shared with the relayer failover stack (docker-compose-failover.yml

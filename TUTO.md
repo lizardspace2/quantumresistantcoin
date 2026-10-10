@@ -84,7 +84,12 @@ quantix-key-forge\relayer-stellar\.env
 cd C:\Users\<toi>\Desktop   # ou le dossier de ton choix
 git clone https://github.com/lizardspace2/quantumresistantcoin.git
 git clone https://github.com/lizardspace2/quantix-key-forge.git
+git clone https://github.com/lizardspace2/dilithium-coin-explorer.git
 ```
+
+`dilithium-coin-explorer` sert à l'indexeur qui alimente Supabase pour
+l'explorer web (le front est hébergé sur Vercel et survit à PC1 tout
+seul).
 
 ### 2.2 Réseau Docker partagé
 
@@ -137,6 +142,13 @@ CLOUDFLARE_NODE_TUNNEL_TOKEN=<token du tunnel quantix-tunnel de PC1>
 CLOUDFLARE_RELAYER_TUNNEL_TOKEN=<token du tunnel quantix-relayer-tunnel de PC1>
 ```
 
+Et pour l'indexeur explorer, copier le `.env` de
+`dilithium-coin-explorer` (clés Supabase) au même emplacement sur PC2 :
+
+```
+dilithium-coin-explorer\.env  → PC2:\...\dilithium-coin-explorer\.env
+```
+
 ### 2.6 Pré-construire les images relayer (recommandé)
 
 Pour que le failover démarre vite le jour J :
@@ -182,11 +194,13 @@ schtasks /create /tn QuantixWatchdog /sc minute /mo 2 /ru SYSTEM `
 1. Le watchdog voit 3 échecs consécutifs sur `/debug` (~6 min)
 2. `ENABLE_MINING=true` → le conteneur `quantix-node` est recréé et mine
 3. `docker-compose-failover.yml --profile failover up -d` :
-   relayers + réplicas `cloudflared` démarrent
-4. Cloudflare route `solana-relayer.*`, `master.*`, `p2p.*` vers PC2
-   (la réplica résout les noms de service localement — d'où l'alias
-   réseau `quantix-master` posé sur le nœud de PC2)
-5. La chaîne continue de grandir, les bridges répondent
+   relayers + réplicas `cloudflared` + indexeur explorer démarrent
+4. Cloudflare route `solana-relayer.*`, `master.*`, `node-explorer.*`,
+   `p2p.*` vers PC2 (la réplica résout les noms de service localement —
+   d'où les alias `quantix-master` et `quantix-explorer` posés sur le
+   nœud de PC2)
+5. La chaîne continue de grandir, les bridges répondent, l'explorer web
+   (Vercel + Supabase) reste alimenté par l'indexeur de PC2
 
 ### PC1 revient
 
@@ -225,9 +239,10 @@ PC2 que `quantix-node` mine et que les relayers tournent
   la transaction reste figée en `minting` et le relayer de PC2 ne la
   reprend pas. Reset manuel :
   `cd relayer-solana && npx tsx clean_stuck_tx.ts`.
-- **`node-explorer.quantumresistantcoin.com` hors service** pendant le
-  failover : pas d'explorer sur PC2 (il coûterait une copie complète +
-  indexer).
+- **L'explorer peut être en retard** pendant les premières minutes du
+  failover : l'indexeur de PC2 poll toutes les 5 min et doit d'abord
+  rattraper les blocs minés pendant l'absence de PC1. Pas de perte de
+  données — juste un léger décalage d'affichage.
 - **Overlap de quelques secondes** entre démarrage des relayers PC2 et
   arrêt effectif de PC1 : le claim non-atomique laisse un risque de
   double-mint résiduel — à corriger un jour par une condition
