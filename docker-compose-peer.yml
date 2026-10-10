@@ -22,3 +22,18 @@ services:
       - ./node/wallet:/app/node/wallet
       # Mount the data directory to persist the blockchain databse
       - ./node/data:/app/data
+    networks:
+      default:
+      quantix-universal-net:
+        # During failover, the Cloudflare tunnel replica routes
+        # master.quantumresistantcoin.com -> http://quantix-master:3001
+        # and the relayers use QUANTIX_NODE_URL=http://quantix-master:3001.
+        # This alias makes that name resolve to THIS node on PC2.
+        aliases:
+          - quantix-master
+
+networks:
+  # Shared with the relayer failover stack (docker-compose-failover.yml
+  # in quantix-key-forge). Create once: docker network create quantix-universal-net
+  quantix-universal-net:
+    external: true
