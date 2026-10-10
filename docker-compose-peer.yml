@@ -10,7 +10,12 @@ services:
     environment:
       - HTTP_PORT=3001
       - P2P_PORT=6001
-      - PEERS=
+      - PEERS=${PEERS:-}
+      # Failover mining: the watchdog toggles this to true only while
+      # the master node is unreachable. NEVER run two miners at once —
+      # the sync code cannot reorg divergent chains.
+      - ENABLE_MINING=${ENABLE_MINING:-false}
+      - SAFE_MODE=true
       - PRIVATE_KEY=node/wallet/private_key
     volumes:
       # Mount the wallet directory to persist the auto-generated private key

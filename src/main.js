@@ -315,6 +315,11 @@ const initAutoMining = () => {
     console.log(`Starting auto-mining with ${interval}ms interval`);
     setInterval(async () => {
         try {
+            // Skip mining while syncing — a block mined on a stale tip
+            // becomes an orphan once the peer's longer chain is applied.
+            if ((0, blockchain_1.getSyncStatus)()) {
+                return;
+            }
             const balance = (0, blockchain_1.getAccountBalance)();
             const latestBlock = (0, blockchain_1.getLatestBlock)();
             if (balance > 0 || latestBlock.index <= 1000000) {
