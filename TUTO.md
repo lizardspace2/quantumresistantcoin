@@ -1,67 +1,65 @@
-# TUTO — Nœud de failover Quantix sur un second PC (PC2)
+# TUTO — Quantix failover node on a second PC (PC2)
 
-Objectif : quand PC1 s'éteint, PC2 prend le relais — le nœud continue de
-miner la chaîne **et** les relayers bridge (Solana / Polygon / Stellar)
-restent joignables via les mêmes URLs publiques Cloudflare.
+Goal: when PC1 goes offline, PC2 takes over — the node keeps mining the
+chain **and** the bridge relayers (Solana / Polygon / Stellar) stay
+reachable through the same public Cloudflare URLs.
 
 ```
-PC1 (principal)                        PC2 (secours)
+PC1 (primary)                          PC2 (backup)
 ─────────────────                      ─────────────────────
-quantix-master (mine)                  quantix-node (suiveur)
-quantix-explorer                          ↓ watchdog (toutes les 2 min)
+quantix-master (mines)                 quantix-node (follower)
+quantix-explorer                          ↓ watchdog (every 2 min)
 quantix-standard                     PC1 down 3× → mining ON
 relayers ×3                             + relayers ON
-tunnels cloudflared                     + tunnels réplicas ON
-                                     PC1 back → tout OFF, resync
+cloudflared tunnels                     + tunnel replicas ON
+                                     PC1 back → all OFF, resync
 ```
 
-**Règle d'or** : jamais deux mineurs, jamais deux relayers en parallèle.
-La resync ne sait pas réorganiser une chaîne fourchue, et le claim
-Supabase des relayers n'est pas atomique (risque de double-mint). Le
-watchdog garantit le mode actif/passif — ne démarre jamais la stack
-failover à la main pendant que PC1 tourne.
+**Golden rule**: never two miners, never two parallel relayers. The
+sync code cannot reorg a forked chain, and the relayers' Supabase claim
+is not atomic (double-mint risk). The watchdog enforces active/passive
+mode — never start the failover stack by hand while PC1 is running.
 
 ---
 
-## 1. Prérequis
+## 1. Prerequisites
 
-### Sur PC2
+### On PC2
 
-- Windows 10/11 avec [Docker Desktop](https://www.docker.com/products/docker-desktop/)
+- Windows 10/11 with [Docker Desktop](https://www.docker.com/products/docker-desktop/)
 - [Git](https://git-scm.com/)
-- PowerShell 5.1+ (fourni avec Windows)
-- ~15 GB libres (la chaîne ~200 MB + images Docker)
+- PowerShell 5.1+ (bundled with Windows)
+- ~15 GB free (chain ~200 MB + Docker images)
 
-### Réseau entre les deux PC
+### Network between the two PCs
 
-Le nœud de PC2 doit joindre le P2P de PC1 (port **6001**) et son API
-(port **3001**). Deux options :
+PC2's node must reach PC1's P2P port (**6001**) and its HTTP API
+(**3001**). Two options:
 
-| Option | Commande | Remarque |
+| Option | How | Notes |
 |---|---|---|
-| **Tailscale** (recommandé) | installer sur les 2 PC, `tailscale ip -4` | zéro config routeur, chiffré, marche hors du LAN |
-| Redirection de port | box → 6001 TCP + 3001 TCP → PC1 | expose les ports sur Internet, IP publique nécessaire |
+| **Tailscale** (recommended) | install on both PCs, `tailscale ip -4` | zero router config, encrypted, works off-LAN |
+| Port forwarding | router → 6001 TCP + 3001 TCP → PC1 | exposes ports on the Internet, needs a public IP |
 
-Dans la suite, `<PC1>` = IP Tailscale (ou LAN) de PC1. Vérifier depuis
-PC2 :
+Below, `<PC1>` = PC1's Tailscale (or LAN) IP. Verify from PC2:
 
 ```powershell
-curl http://<PC1>:3001/debug     # doit renvoyer {"height": ...}
+curl http://<PC1>:3001/debug     # must return {"height": ...}
 ```
 
-### Récupérer les secrets Cloudflare (sur PC1)
+### Retrieve the Cloudflare secrets (on PC1)
 
-Le failover a besoin des tokens des deux tunnels :
+Failover needs both tunnel tokens:
 
 ```powershell
-# Sur PC1
+# On PC1
 cd C:\Users\moi\Desktop\quantumresistantcoin
-Select-String -Path .env -Pattern "TUNNEL"          # token du tunnel nœud
+Select-String -Path .env -Pattern "TUNNEL"          # node tunnel token
 cd C:\Users\moi\Desktop\quantix-key-forge
-Select-String -Path .env -Pattern "TUNNEL"          # token du tunnel relayer
+Select-String -Path .env -Pattern "TUNNEL"          # relayer tunnel token
 ```
 
-Et les fichiers d'environnement des relayers (clés privées des bridges) :
+And the relayer env files (bridge private keys):
 
 ```
 quantix-key-forge\relayer-solana\.env
@@ -69,47 +67,47 @@ quantix-key-forge\relayer-polygon\.env
 quantix-key-forge\relayer-stellar\.env
 ```
 
-> ⚠️ Ces fichiers contiennent les clés privées des vaults bridge.
-> Transfert par clé USB ou `scp` — **jamais** par Git, mail ou cloud non
-> chiffré. Note : ils ont été commités par le passé dans l'historique
-> GitHub — prévoir une rotation des clés à terme.
+> ⚠️ These files hold the bridge vault private keys. Transfer via USB
+> stick or `scp` — **never** through Git, email, or unencrypted cloud.
+> Note: they were previously committed to GitHub history — plan a key
+> rotation at some point.
 
 ---
 
-## 2. Installation sur PC2
+## 2. PC2 installation
 
-### 2.1 Cloner les dépôts
+### 2.1 Clone the repositories
 
 ```powershell
-cd C:\Users\<toi>\Desktop   # ou le dossier de ton choix
+cd C:\Users\<you>\Desktop   # or any folder
 git clone https://github.com/lizardspace2/quantumresistantcoin.git
 git clone https://github.com/lizardspace2/quantix-key-forge.git
 git clone https://github.com/lizardspace2/dilithium-coin-explorer.git
 ```
 
-`dilithium-coin-explorer` sert à l'indexeur qui alimente Supabase pour
-l'explorer web (le front est hébergé sur Vercel et survit à PC1 tout
-seul).
+`dilithium-coin-explorer` provides the indexer that feeds Supabase for
+the web explorer (the frontend is hosted on Vercel and survives PC1 on
+its own).
 
-### 2.2 Réseau Docker partagé
+### 2.2 Shared Docker network
 
 ```powershell
 docker network create quantix-universal-net
 ```
 
-### 2.3 Configurer le nœud
+### 2.3 Configure the node
 
-`quantumresistantcoin\.env` :
+`quantumresistantcoin\.env`:
 
 ```env
 PEERS=ws://<PC1>:6001
 ENABLE_MINING=false
 ```
 
-`ENABLE_MINING=false` : le nœud démarre en suiveur ; c'est le watchdog
-qui le basculera en mineur.
+`ENABLE_MINING=false`: the node starts as a follower; the watchdog will
+flip it to miner.
 
-### 2.4 Démarrer le nœud et synchroniser
+### 2.4 Start the node and sync
 
 ```powershell
 cd quantumresistantcoin
@@ -117,17 +115,17 @@ docker compose -f docker-compose-peer.yml up -d --build
 docker logs -f quantix-node
 ```
 
-Première sync : ~30 min pour ~24 000 blocs (vérification Dilithium).
-Vérifier :
+Initial sync: ~30 min for ~24,000 blocks (Dilithium verification).
+Check:
 
 ```powershell
 curl http://localhost:3001/debug
-# {"height": doit converger vers la hauteur du master, "isSyncing": false}
+# {"height": must converge to the master height, "isSyncing": false}
 ```
 
-### 2.5 Installer les secrets relayer
+### 2.5 Install the relayer secrets
 
-Copier depuis PC1 :
+Copy from PC1:
 
 ```
 relayer-solana\.env   → PC2:\...\quantix-key-forge\relayer-solana\.env
@@ -135,130 +133,128 @@ relayer-polygon\.env  → PC2:\...\quantix-key-forge\relayer-polygon\.env
 relayer-stellar\.env  → PC2:\...\quantix-key-forge\relayer-stellar\.env
 ```
 
-`quantix-key-forge\.env` (nouveau fichier sur PC2) :
+`quantix-key-forge\.env` (new file on PC2):
 
 ```env
-CLOUDFLARE_NODE_TUNNEL_TOKEN=<token du tunnel quantix-tunnel de PC1>
-CLOUDFLARE_RELAYER_TUNNEL_TOKEN=<token du tunnel quantix-relayer-tunnel de PC1>
+CLOUDFLARE_NODE_TUNNEL_TOKEN=<token of the quantix-tunnel on PC1>
+CLOUDFLARE_RELAYER_TUNNEL_TOKEN=<token of the quantix-relayer-tunnel on PC1>
 ```
 
-Et pour l'indexeur explorer, copier le `.env` de
-`dilithium-coin-explorer` (clés Supabase) au même emplacement sur PC2 :
+And for the explorer indexer, copy `dilithium-coin-explorer`'s `.env`
+(Supabase keys) to the same path on PC2:
 
 ```
 dilithium-coin-explorer\.env  → PC2:\...\dilithium-coin-explorer\.env
 ```
 
-### 2.6 Pré-construire les images relayer (recommandé)
+### 2.6 Pre-build the relayer images (recommended)
 
-Pour que le failover démarre vite le jour J :
+So failover starts quickly on the day it matters:
 
 ```powershell
 cd quantix-key-forge
 docker compose -f docker-compose-failover.yml --profile failover build
 ```
 
-Ne **pas** lancer `up` — le profil `failover` est réservé au watchdog.
+Do **not** run `up` — the `failover` profile is reserved for the
+watchdog.
 
-### 2.7 Configurer le watchdog
+### 2.7 Configure the watchdog
 
-Éditer `quantumresistantcoin\scripts\mining-watchdog.ps1` :
+Edit `quantumresistantcoin\scripts\mining-watchdog.ps1`:
 
 ```powershell
 $MasterUrl  = "http://<PC1>:3001/debug"
-$ComposeDir = "C:\Users\<toi>\Desktop\quantumresistantcoin"
-$RelayerDir = "C:\Users\<toi>\Desktop\quantix-key-forge"
+$ComposeDir = "C:\Users\<you>\Desktop\quantumresistantcoin"
+$RelayerDir = "C:\Users\<you>\Desktop\quantix-key-forge"
 ```
 
-Tester à la main (avec PC1 allumé — ne doit rien changer) :
+Test manually (with PC1 online — should change nothing):
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts\mining-watchdog.ps1
 type watchdog.log
-# → "Master reachable" ou aucune action ; ENABLE_MINING reste false
+# → "Master reachable" or no action; ENABLE_MINING stays false
 ```
 
-Planifier toutes les 2 min :
+Schedule every 2 minutes:
 
 ```powershell
 schtasks /create /tn QuantixWatchdog /sc minute /mo 2 /ru SYSTEM `
-  /tr "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\<toi>\Desktop\quantumresistantcoin\scripts\mining-watchdog.ps1"
+  /tr "powershell -NoProfile -ExecutionPolicy Bypass -File C:\Users\<you>\Desktop\quantumresistantcoin\scripts\mining-watchdog.ps1"
 ```
 
 ---
 
-## 3. Ce qui se passe en cas de panne
+## 3. What happens during an outage
 
-### PC1 s'éteint
+### PC1 goes down
 
-1. Le watchdog voit 3 échecs consécutifs sur `/debug` (~6 min)
-2. `ENABLE_MINING=true` → le conteneur `quantix-node` est recréé et mine
-3. `docker-compose-failover.yml --profile failover up -d` :
-   relayers + réplicas `cloudflared` + indexeur explorer démarrent
-4. Cloudflare route `solana-relayer.*`, `master.*`, `node-explorer.*`,
-   `p2p.*` vers PC2 (la réplica résout les noms de service localement —
-   d'où les alias `quantix-master` et `quantix-explorer` posés sur le
-   nœud de PC2)
-5. La chaîne continue de grandir, les bridges répondent, l'explorer web
-   (Vercel + Supabase) reste alimenté par l'indexeur de PC2
+1. The watchdog sees 3 consecutive `/debug` failures (~6 min)
+2. `ENABLE_MINING=true` → the `quantix-node` container is recreated and mines
+3. `docker-compose-failover.yml --profile failover up -d`:
+   relayers + `cloudflared` replicas + explorer indexer start
+4. Cloudflare routes `solana-relayer.*`, `master.*`, `node-explorer.*`,
+   `p2p.*` to PC2 (the replica resolves service names locally — hence
+   the `quantix-master` and `quantix-explorer` network aliases on PC2's
+   node)
+5. The chain keeps growing, the bridges respond, the web explorer
+   (Vercel + Supabase) stays fed by PC2's indexer
 
-### PC1 revient
+### PC1 comes back
 
-1. `quantix-node` reconnecte le master en ≤ 5 s et lui envoie sa chaîne
-   (même base → simple ajout de blocs, pas de reorg nécessaire)
-2. Le watchdog détecte `/debug` OK → arrête la stack failover, repasse
-   `ENABLE_MINING=false`, recrée le conteneur en suiveur
-3. Le master resynchronise les blocs produits pendant son absence
+1. `quantix-node` reconnects to the master within ≤ 5 s and sends its
+   chain (same base → plain block append, no reorg needed)
+2. The watchdog detects `/debug` OK → stops the failover stack, flips
+   `ENABLE_MINING=false`, recreates the container as a follower
+3. The master resyncs the blocks produced while it was offline
 
 ---
 
-## 4. Vérifications
+## 4. Checks
 
-| Test | Commande | Attendu |
+| Test | Command | Expected |
 |---|---|---|
-| Nœud sync | `curl localhost:3001/debug` | `height` = master, `isSyncing:false` |
-| Mining off | `docker logs quantix-node --tail 20` | pas de `Mined block` |
-| Watchdog | `type watchdog.log` | strikes remis à 0 tant que PC1 répond |
-| Failover OFF | `docker ps` | pas de `*-failover`, pas de `quantix-relayer-*` |
+| Node synced | `curl localhost:3001/debug` | `height` = master, `isSyncing:false` |
+| Mining off | `docker logs quantix-node --tail 20` | no `Mined block` |
+| Watchdog | `type watchdog.log` | strikes reset to 0 while PC1 answers |
+| Failover OFF | `docker ps` | no `*-failover`, no `quantix-relayer-*` |
 
-**Test de panne (optionnel, un dimanche calme)** : éteindre le master
-sur PC1 (`docker stop quantix-master`), attendre ~7 min, vérifier sur
-PC2 que `quantix-node` mine et que les relayers tournent
-(`docker ps`). Rallumer PC1, vérifier le retour à la normale dans le
-`watchdog.log`.
-
----
-
-## 5. Limites connues
-
-- **Fenêtre de course au retour de PC1** (~30 s) : si le master mine un
-  bloc avant d'avoir absorbé la chaîne de PC2, il peut rester sur un
-  bloc orphelin. Si ça arrive : `rm data/blockchain.json` sur le master
-  + resync depuis PC2 (la procédure de wipe utilisée pour l'explorer).
-- **Tx bridge bloquée en `minting`** : si PC1 meurt *pendant* un mint,
-  la transaction reste figée en `minting` et le relayer de PC2 ne la
-  reprend pas. Reset manuel :
-  `cd relayer-solana && npx tsx clean_stuck_tx.ts`.
-- **L'explorer peut être en retard** pendant les premières minutes du
-  failover : l'indexeur de PC2 poll toutes les 5 min et doit d'abord
-  rattraper les blocs minés pendant l'absence de PC1. Pas de perte de
-  données — juste un léger décalage d'affichage.
-- **Overlap de quelques secondes** entre démarrage des relayers PC2 et
-  arrêt effectif de PC1 : le claim non-atomique laisse un risque de
-  double-mint résiduel — à corriger un jour par une condition
-  `.eq('status','pending')` sur l'update Supabase.
-- **Clés bridge compromises dans l'historique git** : les `.env` /
-  `*_keys.json` ont été commités puis détrackés — l'historique GitHub
-  les contient encore. Rotation des vaults recommandée.
+**Controlled outage test (optional, on a quiet day)**: stop the master
+on PC1 (`docker stop quantix-master`), wait ~7 min, check on PC2 that
+`quantix-node` mines and the relayers run (`docker ps`). Power PC1 back
+on, verify the return to normal in `watchdog.log`.
 
 ---
 
-## 6. Dépannage rapide
+## 5. Known limitations
 
-| Symptôme | Cause probable | Action |
+- **Race window when PC1 returns** (~30 s): if the master mines its own
+  block before absorbing PC2's chain, it can get stuck on an orphan. If
+  that happens: `rm data/blockchain.json` on the master + resync from
+  PC2 (the wipe procedure already used for the explorer).
+- **Bridge tx stuck in `minting`**: if PC1 dies *mid-mint*, the
+  transaction stays frozen in `minting` and PC2's relayer won't pick it
+  up. Manual reset: `cd relayer-solana && npx tsx clean_stuck_tx.ts`.
+- **Explorer display lag** during the first failover minutes: PC2's
+  indexer polls every 5 min and must first catch up on the blocks mined
+  during PC1's absence. No data loss — just a display delay.
+- **A few seconds of relayer overlap** between PC2's stack starting and
+  PC1's actually dying: the non-atomic claim leaves a residual
+  double-mint risk — to be fixed eventually with an
+  `.eq('status','pending')` condition on the Supabase update.
+- **Bridge keys compromised in git history**: the `.env` /
+  `*_keys.json` files were committed then untracked — GitHub history
+  still contains them. Vault key rotation recommended.
+
+---
+
+## 6. Quick troubleshooting
+
+| Symptom | Likely cause | Action |
 |---|---|---|
-| `connection failed ws://<PC1>:6001` | PC1 éteint ou port fermé | normal en failover ; sinon firewall/Tailscale |
-| Le nœud ne mine pas en failover | `isSyncing` encore vrai | attendre la fin de sync (par design) |
-| Relayers 502 via tunnel | conteneurs pas sur `quantix-universal-net` | `docker network ls`, recréer le réseau |
-| `Invalid State Root` en boucle | état corrompu (rare) | wipe `node/data/` + resync |
-| Double conteneur même nom | stack lancée à la main pendant que watchdog agit | `docker compose -f docker-compose-failover.yml --profile failover stop` |
+| `connection failed ws://<PC1>:6001` | PC1 down or port closed | normal in failover; else firewall/Tailscale |
+| Node not mining during failover | `isSyncing` still true | wait for sync to finish (by design) |
+| Relayers 502 via tunnel | containers not on `quantix-universal-net` | `docker network ls`, recreate the network |
+| `Invalid State Root` looping | corrupted state (rare) | wipe `node/data/` + resync |
+| Duplicate container names | stack started by hand while watchdog ran | `docker compose -f docker-compose-failover.yml --profile failover stop` |
