@@ -4,4 +4,6 @@ node/
 dist/
 *.log
 data/
+data-explorer/
+data-standard/
 .env
