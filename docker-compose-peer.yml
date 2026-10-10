@@ -1,9 +1,14 @@
-version: '3'
 services:
   node:
     build: .
     container_name: quantix-node
     restart: always
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '6.0'
+          memory: 4G
     ports:
       - "3001:3001"
       - "6001:6001"
