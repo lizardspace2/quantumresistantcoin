@@ -15,6 +15,24 @@ const knownPeers: Set<string> = new Set();
 const pendingPeers: Set<string> = new Set();
 const peerHeights: Map<WebSocket, number> = new Map();
 
+const MAX_SOCKETS = 32;
+
+/**
+ * Normalized peer identity ("host:port") — ws normalizes socket.url to
+ * include a trailing slash, so raw URL comparison fails and dedup breaks.
+ */
+const peerKey = (url: string): string => {
+    try {
+        return new URL(url).host;
+    } catch (e) {
+        return url;
+    }
+};
+
+const socketPeerKey = (ws: WebSocket): string | undefined => (ws as any).__peerKey;
+
+const remoteAddress = (ws: WebSocket): string | undefined => (ws as any)?._socket?.remoteAddress;
+
 
 enum MessageType {
     QUERY_LATEST = 0,
@@ -42,6 +60,18 @@ const initP2PServer = (p2pPort: number) => {
             ws.close();
             return;
         }
+        // Reject duplicate connections: one socket per remote host is enough.
+        if (sockets.find((s) => remoteAddress(s) === ip)) {
+            console.log('Rejected duplicate connection from: ' + ip);
+            ws.close();
+            return;
+        }
+        // Safety cap: never let the socket table grow unbounded again.
+        if (sockets.length >= MAX_SOCKETS) {
+            console.log('Rejected connection, socket cap reached: ' + ip);
+            ws.close();
+            return;
+        }
         initConnection(ws);
     });
     console.log('listening websocket p2p port on: ' + p2pPort);
@@ -49,7 +79,8 @@ const initP2PServer = (p2pPort: number) => {
     // Keep-alive/Reconnection loop
     setInterval(() => {
         knownPeers.forEach((peer) => {
-            const isConnected = sockets.find((s) => s.url === peer);
+            const key = peerKey(peer);
+            const isConnected = sockets.find((s) => socketPeerKey(s) === key);
             if (!isConnected && !pendingPeers.has(peer)) {
                 console.log('Reconnecting to peer: ' + peer);
                 connectToPeers(peer);
@@ -136,14 +167,21 @@ const initMessageHandler = (ws: WebSocket) => {
                     console.log('invalid transaction received: %s', JSON.stringify(message.data));
                     return;
                 }
+                let addedToPool = 0;
                 receivedTransactions.forEach((transaction: Transaction) => {
                     try {
                         handleReceivedTransaction(transaction);
-                        broadcast(responseTransactionPoolMsg());
+                        addedToPool++;
                     } catch (e) {
                         console.log(e.message);
                     }
                 });
+                // Relay the pool only once per message, and only when it
+                // actually changed — broadcasting per transaction caused a
+                // feedback storm between peers.
+                if (addedToPool > 0) {
+                    broadcast(responseTransactionPoolMsg());
+                }
             } else if (message.type === MessageType.QUERY_HEADERS) {
                 write(ws, responseHeadersMsg());
             } else if (message.type === MessageType.RESPONSE_HEADERS) {
@@ -418,8 +456,10 @@ const broadcastLatest = (): void => {
 };
 
 const connectToPeers = (newPeer: string): void => {
-    // Avoid connecting to self? (Assumption: user manages peer list)
-    if (getSockets().find((s) => s.url === newPeer)) {
+    // Avoid duplicate outbound connections — compare normalized host:port
+    // because ws.url gets normalized (trailing slash) by the ws library.
+    const key = peerKey(newPeer);
+    if (getSockets().find((s) => socketPeerKey(s) === key)) {
         return;
     }
 
@@ -433,6 +473,7 @@ const connectToPeers = (newPeer: string): void => {
     pendingPeers.add(newPeer);
 
     const ws: WebSocket = new WebSocket(newPeer);
+    (ws as any).__peerKey = key;
     ws.on('open', () => {
         console.log('Connect to peer success: ' + newPeer);
         pendingPeers.delete(newPeer);
