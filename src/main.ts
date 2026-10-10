@@ -351,11 +351,13 @@ const initQuantum = async () => {
         initAutoMining();
     }
 
-    const bootNodes = [
-        'ws://172.20.0.10:6001', // Master Node
-        'ws://172.20.0.20:6001', // Explorer Node
-        'ws://172.20.0.30:6001'  // Standard Node
-    ];
+    // Boot nodes are opt-in via BOOT_NODES env — the previous hardcoded
+    // 172.20.0.x addresses were a stale Docker subnet that produced a
+    // connect ETIMEDOUT retry loop every 5 s.
+    const bootNodes = (process.env.BOOT_NODES || '')
+        .split(',')
+        .map((p) => p.trim())
+        .filter((p) => p.length > 0);
     let peers = bootNodes;
 
     if (process.env.PEERS) {
