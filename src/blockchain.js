@@ -450,10 +450,15 @@ const hashMatchesBlockContent = (block) => {
     const blockHash = calculateHashForBlock(block);
     return blockHash === block.hash;
 };
+// Bootstrap bonus: early minters get a decaying effective-balance floor so
+// newcomers can win blocks without stake. Decays linearly to 0 at
+// mintingWithoutCoinIndex, where the pure PoS rule takes over.
+const BOOTSTRAP_BONUS = 10000;
 const isBlockStakingValid = (prevhash, address, timestamp, balance, difficulty, index) => {
     difficulty = difficulty + 1;
     if (index <= mintingWithoutCoinIndex) {
-        balance = balance + 1;
+        const bootstrapBonus = Math.floor(BOOTSTRAP_BONUS * (1 - index / mintingWithoutCoinIndex));
+        balance = balance + Math.max(1, bootstrapBonus);
     }
     const balanceOverDifficulty = TWO_POW_256.times(balance).dividedBy(difficulty);
     const stakingHash = CryptoJS.SHA256(prevhash + address + timestamp).toString();

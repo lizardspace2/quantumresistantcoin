@@ -92,9 +92,12 @@ timestamp tick: `SHA256(prevHash + address + timestamp)` must be below a
 target proportional to your balance. More balance → better odds.
 
 **Can I mine? Do I need a stake?**
-`ENABLE_MINING=true` starts the mining loop. A non-zero balance improves
-your odds (below block 1,000,000 even a zero balance gets a small boost).
-Realistically you need some QTX to win regularly.
+`ENABLE_MINING=true` starts the mining loop — and **no, you don't need
+coins to start**. Until block 1,000,000 every minter gets a decaying
+bootstrap bonus (`≈10,000` effective balance at launch, shrinking to 0):
+a zero-balance node wins roughly a block per week at current difficulty.
+Your real QTX balance stacks on top of the bonus — get some from the
+faucet to seriously improve your odds.
 
 **How fast are blocks?**
 Target: 300 s, difficulty self-adjusts every 10 blocks. If the chain

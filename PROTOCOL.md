@@ -46,6 +46,11 @@ SHA256(prevHash + minterAddress + timestamp)  <  2^256 · balance / (difficulty 
 ```
 
 - Your chance to mint a block scales linearly with your **coin balance**
+- **Bootstrap bonus**: before block 1,000,000, every minter gets a
+  decaying effective-balance floor
+  `bonus = max(1, floor(10000 · (1 − index/1M)))` — newcomers with zero
+  QTX can still win blocks (≈1 block/week at launch difficulty), and the
+  bonus fades to 0 as the network matures into pure PoS
 - Target block time: **300 s**, adjusted every **10 blocks** (clamped to
   ±4× per adjustment)
 - Chain selection: the valid chain with the highest cumulative
@@ -102,6 +107,10 @@ Key endpoints: `/info`, `/debug`, `/block/:hash`, `/blocks/:from/:to`,
 
 - **Small validator set** — today the network is operated by a handful of
   nodes; the more public nodes join, the more decentralized the lottery
+- **Bootstrap bonus is Sybil-able** — the decaying floor is per-address,
+  so spinning up N wallets yields N lottery tickets. It is bounded (the
+  bonus halves every ~500k blocks and dies at 1M) and it exists to seed
+  early adoption — but it is a known, accepted trade-off, not a bug
 - **Timestamp entropy** — the PoS lottery uses `timestamp` as its only
   entropy source per round, which is standard for this class of PoS but
   means an adversary can grind timestamps within the acceptance window
