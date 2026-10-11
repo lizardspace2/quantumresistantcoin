@@ -49,6 +49,19 @@ const initHttpServer = (myHttpPort: number) => {
     app.set('etag', false);
     app.use(bodyParser.json());
 
+    // Read-only API — allow webapps (wallet, explorer, docs pages) to query
+    // node status from the browser. Mutating endpoints stay gated by SAFE_MODE.
+    app.use((req, res, next) => {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        if (req.method === 'OPTIONS') {
+            res.status(204).end();
+            return;
+        }
+        next();
+    });
+
     app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
         if (err) {
             res.status(400).send(err.message);
