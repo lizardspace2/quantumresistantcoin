@@ -1,5 +1,8 @@
 name: Publish node image
 
+# Requires repo Settings → Actions → General → Workflow permissions → "Read and write permissions"
+# so GITHUB_TOKEN can push to GHCR.
+
 on:
   push:
     branches: [main]
