@@ -38,6 +38,7 @@ curl http://localhost:3001/debug            # {"height": ..., "isSyncing": false
 - Port `6001` must be reachable for inbound peers; change host ports with `HTTP_API_PORT` / `P2P_HOST_PORT`
 - From inside the repo, `docker compose -f docker-compose.public.yml up -d --build` builds from source instead of pulling
 - To run your own HA failover node (watchdog + tunnels + relayers), see [TUTO.md](TUTO.md)
+- Feeling adventurous? You can even run a node on an **Android phone** via Termux — see [MOBILE.md](MOBILE.md) (fun, but a PC is better)
 
 ## 🚀 Deployment
 
