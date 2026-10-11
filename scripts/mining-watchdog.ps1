@@ -11,8 +11,9 @@
 #   3. Schedule: schtasks /create /tn QuantixWatchdog /sc minute /mo 2 `
 #        /tr "powershell -NoProfile -ExecutionPolicy Bypass -File C:\path\mining-watchdog.ps1"
 #
-# IMPORTANT: mining overlap = permanent fork, and parallel relayers can
-# double-mint bridge txs (the Supabase claim is not atomic). The 3-strike
+# IMPORTANT: mining overlap = permanent fork. Parallel relayers are safe
+# (the Supabase mint claim is atomic), but they should still stay passive
+# until failover to avoid surprising external RPC burns. The 3-strike
 # debounce avoids flapping; keep the check interval at 1-2 minutes minimum.
 
 $MasterUrl   = "http://PC1_TAILSCALE_IP:3001/debug"   # <-- EDIT ME
@@ -40,7 +41,7 @@ function Test-Master {
 function Set-Mining([bool]$enabled) {
     # Write ENABLE_MINING into .env and recreate the container so the
     # new variable is picked up at boot.
-    $line = "ENABLE_MINING=" + ($enabled ? "true" : "false")
+    if ($enabled) { $line = "ENABLE_MINING=true" } else { $line = "ENABLE_MINING=false" }
     if (Test-Path $EnvFile) {
         (Get-Content $EnvFile) -replace '^ENABLE_MINING=.*', $line |
             Where-Object { $_ -notmatch '^$' } | Set-Content $EnvFile
