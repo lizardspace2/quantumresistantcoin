@@ -11,6 +11,9 @@ computers — instead of ECDSA, which Shor's algorithm breaks. Addresses
 📖 **[PROTOCOL.md](PROTOCOL.md)** — how the chain actually works: signatures,
 PoS lottery, difficulty adjustment, P2P sync and signed snapshots.
 
+❓ **[FAQ.md](FAQ.md)** — questions & answers: quantum resistance, mining,
+snapshots, mobile nodes, troubleshooting.
+
 **🌐 Official Webapp:** [www.quantumresistantcoin.com](https://www.quantumresistantcoin.com)
 
 ## ⚡ Run a node (Docker)
