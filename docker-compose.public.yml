@@ -1,0 +1,36 @@
+# Public follower node — standalone compose file.
+# Works without the repo sources (pulls the prebuilt image from GHCR).
+#
+#   docker compose -f docker-compose.public.yml up -d
+#
+services:
+  node:
+    image: ghcr.io/lizardspace2/quantix-node:latest
+    pull_policy: always
+    build: . # fallback: `docker compose -f docker-compose.public.yml up -d --build` inside the repo
+    container_name: quantix-node
+    restart: always
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    ports:
+      # P2P is public-facing by design — inbound peers need it reachable.
+      - "${P2P_HOST_PORT:-6001}:6001"
+      # HTTP API bound to localhost only — never expose a wallet API.
+      - "127.0.0.1:${HTTP_API_PORT:-3001}:3001"
+    environment:
+      - HTTP_PORT=3001
+      - P2P_PORT=6001
+      # Public seed over the Cloudflare tunnel (wss through the relay).
+      - PEERS=${PEERS:-wss://p2p.quantumresistantcoin.com}
+      # Follower by default. ENABLE_MINING=true mines — only enable if you
+      # intend to produce blocks (see README → Run a node).
+      - ENABLE_MINING=${ENABLE_MINING:-false}
+      - SAFE_MODE=true
+      - PRIVATE_KEY=node/wallet/private_key
+    volumes:
+      - ./node/wallet:/app/node/wallet
+      - ./node/data:/app/data

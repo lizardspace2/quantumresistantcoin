@@ -52,7 +52,10 @@ class Message {
 }
 
 const initP2PServer = (p2pPort: number) => {
-    const server: Server = new WebSocket.Server({ port: p2pPort });
+    // 64 MB payload cap (ws defaults to 100 MB) — plenty for chunked
+    // block sync; raised explicitly so an unusually large message batch
+    // can't silently kill peer connections.
+    const server: Server = new WebSocket.Server({ port: p2pPort, maxPayload: 64 * 1024 * 1024 });
     server.on('connection', (ws: WebSocket, req: any) => {
         const ip = req.socket.remoteAddress;
         if (peerManager.isBanned(ip)) {
@@ -278,10 +281,17 @@ const queryHeadersMsg = (): Message => ({
     'data': null
 });
 
-const responseHeadersMsg = (): Message => ({
-    'type': MessageType.RESPONSE_HEADERS,
-    'data': JSON.stringify(getBlockHeaders(0, getBlockchain().length))
-});
+const responseHeadersMsg = (): Message => {
+    // The consumer only reads the LAST header's index (peer height), so
+    // sending the whole header set is wasted bandwidth — with Dilithium
+    // signatures it exceeds ws maxPayload (>100 MB) and fresh nodes can
+    // never finish their first sync. Send the tail only.
+    const blockchain = getBlockchain();
+    return {
+        'type': MessageType.RESPONSE_HEADERS,
+        'data': JSON.stringify(getBlockHeaders(Math.max(0, blockchain.length - 50), blockchain.length))
+    };
+};
 
 const initErrorHandler = (ws: WebSocket) => {
     const closeConnection = (myWs: WebSocket) => {
@@ -472,7 +482,7 @@ const connectToPeers = (newPeer: string): void => {
     console.log('Attempting connection to peer: ' + newPeer);
     pendingPeers.add(newPeer);
 
-    const ws: WebSocket = new WebSocket(newPeer);
+    const ws: WebSocket = new WebSocket(newPeer, { maxPayload: 64 * 1024 * 1024 });
     (ws as any).__peerKey = key;
     ws.on('open', () => {
         console.log('Connect to peer success: ' + newPeer);

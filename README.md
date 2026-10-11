@@ -4,6 +4,32 @@ Quantix is a lightweight, Proof-of-Stake (PoS) blockchain implementation geared 
 
 **🌐 Official Webapp:** [www.quantumresistantcoin.com](https://www.quantumresistantcoin.com)
 
+## ⚡ Run a node (Docker)
+
+Requires [Docker](https://www.docker.com/products/docker-desktop/). One command — no repo clone, no build:
+
+```bash
+curl -O https://raw.githubusercontent.com/lizardspace2/quantumresistantcoin/main/docker-compose.public.yml
+docker compose -f docker-compose.public.yml up -d
+```
+
+The node pulls the prebuilt image, connects to the public seed
+(`wss://p2p.quantumresistantcoin.com`) and starts syncing (~30 min for
+the first sync — Dilithium signature verification is CPU-heavy).
+
+```bash
+docker logs -f quantix-node                 # watch the sync
+curl http://localhost:3001/debug            # {"height": ..., "isSyncing": false}
+```
+
+**Notes**
+
+- Runs as a **follower** by default. To mine: `ENABLE_MINING=true docker compose -f docker-compose.public.yml up -d`
+- The HTTP API is bound to `127.0.0.1` only — never expose it publicly (it is a wallet API)
+- Port `6001` must be reachable for inbound peers; change host ports with `HTTP_API_PORT` / `P2P_HOST_PORT`
+- From inside the repo, `docker compose -f docker-compose.public.yml up -d --build` builds from source instead of pulling
+- To run your own HA failover node (watchdog + tunnels + relayers), see [TUTO.md](TUTO.md)
+
 ## 🚀 Deployment
 
 We provide detailed guides for deploying Quantix nodes across various cloud providers, with a primary focus on Google Cloud Platform.

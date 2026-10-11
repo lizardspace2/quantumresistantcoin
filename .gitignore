@@ -7,3 +7,9 @@ data/
 data-explorer/
 data-standard/
 .envdata-standard.bak/
+
+# Secrets & local data
+.env
+data-standard.bak/
+node/data/
+node/wallet/
