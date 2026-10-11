@@ -1,6 +1,15 @@
 # Quantix Core (Proof-of-Stake)
 
-Quantix is a lightweight, Proof-of-Stake (PoS) blockchain implementation geared towards scalability and ease of deployment.
+Quantix is a lightweight, **post-quantum**, Proof-of-Stake (PoS) blockchain
+implementation geared towards scalability and ease of deployment.
+
+Transactions are signed with **ML-DSA (CRYSTALS-Dilithium, FIPS-204)** —
+the lattice-based signature scheme NIST standardized to resist quantum
+computers — instead of ECDSA, which Shor's algorithm breaks. Addresses
+*are* ML-DSA public keys; consensus is a balance-weighted staking lottery.
+
+📖 **[PROTOCOL.md](PROTOCOL.md)** — how the chain actually works: signatures,
+PoS lottery, difficulty adjustment, P2P sync and signed snapshots.
 
 **🌐 Official Webapp:** [www.quantumresistantcoin.com](https://www.quantumresistantcoin.com)
 
