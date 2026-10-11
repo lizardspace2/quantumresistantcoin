@@ -5,7 +5,7 @@
 #
 services:
   node:
-    image: ghcr.io/lizardspace2/quantix-node:latest
+    image: ghcr.io/lizardspace2/quantix-chain-node:latest
     pull_policy: always
     build: . # fallback: `docker compose -f docker-compose.public.yml up -d --build` inside the repo
     container_name: quantix-node
