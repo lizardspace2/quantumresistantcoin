@@ -12,3 +12,7 @@ data-standard/
 data-standard.bak/
 node/data/
 node/wallet/
+private_key
+*.key
+secrets-quantix/
+*.secrets
