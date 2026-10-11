@@ -18,6 +18,7 @@
  */
 import * as  bodyParser from 'body-parser';
 import express from 'express';
+import { createReadStream, existsSync, readFileSync } from 'fs';
 // import _ from 'lodash'; // Removed to avoid typing issues
 import {
     Block, generateNextBlock, generatenextBlockWithTransaction, generateRawNextBlock, getAccountBalance,
@@ -28,6 +29,7 @@ import { connectToPeers, getSockets, initP2PServer, broadCastTransactionPool, ge
 import { UnspentTxOut } from './transaction';
 import { getTransactionPool } from './transactionPool';
 import { getPublicFromWallet, initWallet, getPrivateFromWallet } from './wallet';
+import { startSnapshotLoop } from './snapshot';
 import { yieldToEventLoop } from './utils_async';
 
 const httpPort: number = parseInt(process.env.HTTP_PORT || '3001');
@@ -308,6 +310,28 @@ const initHttpServer = (myHttpPort: number) => {
         });
     });
 
+    app.get('/snapshot-meta', (req, res) => {
+        const metaPath = 'data/snapshot/meta.json';
+        if (!existsSync(metaPath)) {
+            res.status(404).send({ error: 'snapshot not generated yet' });
+            return;
+        }
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.send(JSON.parse(readFileSync(metaPath, 'utf8')));
+    });
+
+    app.get('/snapshot', (req, res) => {
+        const gzPath = 'data/snapshot/chain.json.gz';
+        if (!existsSync(gzPath)) {
+            res.status(404).send({ error: 'snapshot not generated yet' });
+            return;
+        }
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', 'attachment; filename="quantix-chain.json.gz"');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        createReadStream(gzPath).pipe(res);
+    });
+
     app.listen(myHttpPort, '0.0.0.0', () => {
         console.log('Listening http on port: ' + myHttpPort);
         if (safeMode) {
@@ -354,6 +378,9 @@ const initQuantum = async () => {
     initP2PServer(p2pPort);
     if (process.env.ENABLE_MINING === 'true') {
         initAutoMining();
+    }
+    if (process.env.SNAPSHOT_EXPORT === 'true') {
+        startSnapshotLoop();
     }
 
     // Boot nodes are opt-in via BOOT_NODES env — the previous hardcoded

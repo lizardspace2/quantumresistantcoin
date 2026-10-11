@@ -15,6 +15,11 @@ services:
         max-size: "50m"
         max-file: "3"
     env_file: .env
+    environment:
+      # Publishes a signed chain snapshot on /snapshot every 6h — feeds the
+      # public-node bootstrap (see docker-compose.public.yml).
+      - SNAPSHOT_EXPORT=true
+      - SNAPSHOT_INTERVAL_MINUTES=360
     ports:
       - "3001:3001"
       - "6001:6001"

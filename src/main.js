@@ -46,11 +46,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
  */
 const bodyParser = __importStar(require("body-parser"));
 const express_1 = __importDefault(require("express"));
+const fs_1 = require("fs");
 // import _ from 'lodash'; // Removed to avoid typing issues
 const blockchain_1 = require("./blockchain");
 const p2p_1 = require("./p2p");
 const transactionPool_1 = require("./transactionPool");
 const wallet_1 = require("./wallet");
+const snapshot_1 = require("./snapshot");
 const utils_async_1 = require("./utils_async");
 const httpPort = parseInt(process.env.HTTP_PORT || '3001');
 const p2pPort = parseInt(process.env.P2P_PORT || '6001');
@@ -303,6 +305,26 @@ const initHttpServer = (myHttpPort) => {
             }))
         });
     });
+    app.get('/snapshot-meta', (req, res) => {
+        const metaPath = 'data/snapshot/meta.json';
+        if (!(0, fs_1.existsSync)(metaPath)) {
+            res.status(404).send({ error: 'snapshot not generated yet' });
+            return;
+        }
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        res.send(JSON.parse((0, fs_1.readFileSync)(metaPath, 'utf8')));
+    });
+    app.get('/snapshot', (req, res) => {
+        const gzPath = 'data/snapshot/chain.json.gz';
+        if (!(0, fs_1.existsSync)(gzPath)) {
+            res.status(404).send({ error: 'snapshot not generated yet' });
+            return;
+        }
+        res.setHeader('Content-Type', 'application/gzip');
+        res.setHeader('Content-Disposition', 'attachment; filename="quantix-chain.json.gz"');
+        res.setHeader('Cache-Control', 'public, max-age=300');
+        (0, fs_1.createReadStream)(gzPath).pipe(res);
+    });
     app.listen(myHttpPort, '0.0.0.0', () => {
         console.log('Listening http on port: ' + myHttpPort);
         if (safeMode) {
@@ -349,6 +371,9 @@ const initQuantum = async () => {
     (0, p2p_1.initP2PServer)(p2pPort);
     if (process.env.ENABLE_MINING === 'true') {
         initAutoMining();
+    }
+    if (process.env.SNAPSHOT_EXPORT === 'true') {
+        (0, snapshot_1.startSnapshotLoop)();
     }
     // Boot nodes are opt-in via BOOT_NODES env — the previous hardcoded
     // 172.20.0.x addresses were a stale Docker subnet that produced a

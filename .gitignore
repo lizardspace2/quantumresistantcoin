@@ -6,7 +6,6 @@ dist/
 data/
 data-explorer/
 data-standard/
-.envdata-standard.bak/
 
 # Secrets & local data
 .env

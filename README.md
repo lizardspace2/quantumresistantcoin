@@ -13,9 +13,18 @@ curl -O https://raw.githubusercontent.com/lizardspace2/quantumresistantcoin/main
 docker compose -f docker-compose.public.yml up -d
 ```
 
-The node pulls the prebuilt image, connects to the public seed
-(`wss://p2p.quantumresistantcoin.com`) and starts syncing (~30 min for
-the first sync — Dilithium signature verification is CPU-heavy).
+The node pulls the prebuilt image, then a `bootstrap` step downloads the
+latest **signed chain snapshot** (~5 MB) from
+`https://master.quantumresistantcoin.com/snapshot`, verifies its SHA-256
+and its **ML-DSA-65 signature** against the operator's pinned public key,
+and only then starts the node — which syncs the remaining few hundred
+blocks in a couple of minutes instead of replaying the whole chain.
+
+Trust anchor: the signature is verified against the operator's ML-DSA
+public key (the genesis/master address) pinned as `SNAPSHOT_SIGNER` in
+`docker-compose.public.yml`. A snapshot not signed by that key is refused.
+To re-bootstrap an existing node: `SNAPSHOT_FORCE=true docker compose -f
+docker-compose.public.yml up -d`.
 
 ```bash
 docker logs -f quantix-node                 # watch the sync
